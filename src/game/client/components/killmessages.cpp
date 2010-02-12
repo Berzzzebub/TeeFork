@@ -5,6 +5,9 @@
 #include <game/client/gameclient.hpp>
 #include <game/client/animstate.hpp>
 #include "killmessages.hpp"
+#include "skins.hpp"
+
+#include <game/client/teecomp.hpp>
 
 void KILLMESSAGES::on_reset()
 {
@@ -29,100 +32,154 @@ void KILLMESSAGES::on_message(int msgtype, void *rawmsg)
 
 		// add the message
 		killmsg_current = (killmsg_current+1)%killmsg_max;
-		killmsgs[killmsg_current] = kill;		
+		killmsgs[killmsg_current] = kill;
+
+		if(!gameclient.freeview && (kill.victim == gameclient.spectate_cid) && gameclient.snap.characters[kill.killer].active)
+			gameclient.killer_cid = kill.killer;
 	}
 }
 
 void KILLMESSAGES::on_render()
 {
-	float width = 400*3.0f*gfx_screenaspect();
-	float height = 400*3.0f;
-
-	gfx_mapscreen(0, 0, width*1.5f, height*1.5f);
-	float startx = width*1.5f-10.0f;
-	float y = 20.0f;
-
-	for(int i = 0; i < killmsg_max; i++)
+	if(config.cl_render_kill && !config.cl_clear_all)
 	{
+		float width = 400*3.0f*gfx_screenaspect();
+		float height = 400*3.0f;
 
-		int r = (killmsg_current+i+1)%killmsg_max;
-		if(client_tick() > killmsgs[r].tick+50*10)
+		gfx_mapscreen(0, 0, width*1.5f, height*1.5f);
+		float startx = width*1.5f-10.0f;
+		float y = 20.0f;
+
+		for(int i = 0; i < killmsg_max; i++)
+		{
+
+			int r = (killmsg_current+i+1)%killmsg_max;
+			if(client_tick() > killmsgs[r].tick+50*10)
 			continue;
 
-		float font_size = 36.0f;
-		float killername_w = gfx_text_width(0, font_size, gameclient.clients[killmsgs[r].killer].name, -1);
-		float victimname_w = gfx_text_width(0, font_size, gameclient.clients[killmsgs[r].victim].name, -1);
+			float font_size = 36.0f;
+			float killername_w = gfx_text_width(0, font_size, gameclient.clients[killmsgs[r].killer].name, -1);
+			float victimname_w = gfx_text_width(0, font_size, gameclient.clients[killmsgs[r].victim].name, -1);
 
-		float x = startx;
+			float x = startx;
 
-		// render victim name
-		x -= victimname_w;
-		gfx_text(0, x, y, font_size, gameclient.clients[killmsgs[r].victim].name, -1);
+			// render victim name
+			x -= victimname_w;
+			gfx_text(0, x, y, font_size, gameclient.clients[killmsgs[r].victim].name, -1);
 
-		// render victim tee
-		x -= 24.0f;
+			// render victim tee
+			x -= 24.0f;
 		
-		if(gameclient.snap.gameobj && gameclient.snap.gameobj->flags&GAMEFLAG_FLAGS)
-		{
-			if(killmsgs[r].mode_special&1)
-			{
-				gfx_blend_normal();
-				gfx_texture_set(data->images[IMAGE_GAME].id);
-				gfx_quads_begin();
-
-				if(gameclient.clients[killmsgs[r].victim].team == 0) select_sprite(SPRITE_FLAG_BLUE);
-				else select_sprite(SPRITE_FLAG_RED);
-				
-				float size = 56.0f;
-				gfx_quads_drawTL(x, y-16, size/2, size);
-				gfx_quads_end();					
-			}
-		}
-		
-		render_tee(ANIMSTATE::get_idle(), &gameclient.clients[killmsgs[r].victim].render_info, EMOTE_PAIN, vec2(-1,0), vec2(x, y+28));
-		x -= 32.0f;
-		
-		// render weapon
-		x -= 44.0f;
-		if (killmsgs[r].weapon >= 0)
-		{
-			gfx_texture_set(data->images[IMAGE_GAME].id);
-			gfx_quads_begin();
-			select_sprite(data->weapons.id[killmsgs[r].weapon].sprite_body);
-			draw_sprite(x, y+28, 96);
-			gfx_quads_end();
-		}
-		x -= 52.0f;
-
-		if(killmsgs[r].victim != killmsgs[r].killer)
-		{
 			if(gameclient.snap.gameobj && gameclient.snap.gameobj->flags&GAMEFLAG_FLAGS)
 			{
-				if(killmsgs[r].mode_special&2)
+				if(killmsgs[r].mode_special&1)
 				{
 					gfx_blend_normal();
-					gfx_texture_set(data->images[IMAGE_GAME].id);
+					if(config.tc_colored_flags)
+						gfx_texture_set(data->images[IMAGE_GAME_GRAY].id);
+					else
+						gfx_texture_set(data->images[IMAGE_GAME].id);
 					gfx_quads_begin();
-
-					if(gameclient.clients[killmsgs[r].killer].team == 0) select_sprite(SPRITE_FLAG_BLUE, SPRITE_FLAG_FLIP_X);
-					else select_sprite(SPRITE_FLAG_RED, SPRITE_FLAG_FLIP_X);
-					
+	
+					if(gameclient.clients[killmsgs[r].victim].team == 0) select_sprite(SPRITE_FLAG_BLUE);
+					else select_sprite(SPRITE_FLAG_RED);
+					if(config.tc_colored_flags)
+					{
+						vec3 col = TeecompUtils::getTeamColor(1-gameclient.clients[killmsgs[r].victim].team,
+							gameclient.snap.local_info->team,
+							config.tc_colored_tees_team1, config.tc_colored_tees_team2,
+							config.tc_colored_tees_method);
+						gfx_setcolor(col.r, col.g, col.b, 1.0f);
+					}
+				
 					float size = 56.0f;
-					gfx_quads_drawTL(x-56, y-16, size/2, size);
-					gfx_quads_end();				
+					gfx_quads_drawTL(x, y-16, size/2, size);
+					gfx_quads_end();					
 				}
-			}				
+			}
+		
+			// anti rainbow
+			TEE_RENDER_INFO victim = gameclient.clients[killmsgs[r].victim].render_info;
 			
-			// render killer tee
-			x -= 24.0f;
-			render_tee(ANIMSTATE::get_idle(), &gameclient.clients[killmsgs[r].killer].render_info, EMOTE_ANGRY, vec2(1,0), vec2(x, y+28));
+			if(config.cl_anti_rainbow && (gameclient.clients[killmsgs[r].victim].color_change_count > config.cl_anti_rainbow_count))
+			{
+				if(config.tc_force_skin_team1)
+					victim.texture = gameclient.skins->get(max(0, gameclient.skins->find(config.tc_forced_skin1)))->org_texture;
+				else
+					victim.texture = gameclient.skins->get(gameclient.clients[killmsgs[r].victim].skin_id)->org_texture;
+				victim.color_body = vec4(1,1,1,1);
+				victim.color_feet = vec4(1,1,1,1);
+			}
+
+			render_tee(ANIMSTATE::get_idle(), &victim, EMOTE_PAIN, vec2(-1,0), vec2(x, y+28));
 			x -= 32.0f;
+		
+			// render weapon
+			x -= 44.0f;
+			if (killmsgs[r].weapon >= 0)
+			{
+				gfx_texture_set(data->images[IMAGE_GAME].id);
+				gfx_quads_begin();
+				select_sprite(data->weapons.id[killmsgs[r].weapon].sprite_body);
+				draw_sprite(x, y+28, 96);
+				gfx_quads_end();
+			}
+			x -= 52.0f;
 
-			// render killer name
-			x -= killername_w;
-			gfx_text(0, x, y, font_size, gameclient.clients[killmsgs[r].killer].name, -1);
+			if(killmsgs[r].victim != killmsgs[r].killer)
+			{
+				if(gameclient.snap.gameobj && gameclient.snap.gameobj->flags&GAMEFLAG_FLAGS)
+				{
+					if(killmsgs[r].mode_special&2)
+					{
+						gfx_blend_normal();
+						if(config.tc_colored_flags)
+							gfx_texture_set(data->images[IMAGE_GAME_GRAY].id);
+						else
+							gfx_texture_set(data->images[IMAGE_GAME].id);
+						gfx_quads_begin();
+
+						if(gameclient.clients[killmsgs[r].killer].team == 0) select_sprite(SPRITE_FLAG_BLUE, SPRITE_FLAG_FLIP_X);
+						else select_sprite(SPRITE_FLAG_RED, SPRITE_FLAG_FLIP_X);
+						if(config.tc_colored_flags)
+						{
+							vec3 col = TeecompUtils::getTeamColor(1-gameclient.clients[killmsgs[r].killer].team,
+								gameclient.snap.local_info->team,
+								config.tc_colored_tees_team1, config.tc_colored_tees_team2,
+								config.tc_colored_tees_method);
+							gfx_setcolor(col.r, col.g, col.b, 1.0f);
+						}
+					
+						float size = 56.0f;
+						gfx_quads_drawTL(x-56, y-16, size/2, size);
+							gfx_quads_end();				
+					}
+				}				
+			
+				// anti rainbow
+				TEE_RENDER_INFO killer = gameclient.clients[killmsgs[r].killer].render_info;
+				
+				if(config.cl_anti_rainbow && (gameclient.clients[killmsgs[r].killer].color_change_count > config.cl_anti_rainbow_count))
+				{
+					if(config.tc_force_skin_team1)
+						killer.texture = gameclient.skins->get(max(0, gameclient.skins->find(config.tc_forced_skin1)))->org_texture;
+					else
+						killer.texture = gameclient.skins->get(gameclient.clients[killmsgs[r].killer].skin_id)->org_texture;
+					killer.color_body = vec4(1,1,1,1);
+					killer.color_feet = vec4(1,1,1,1);
+ 				}
+				
+				// render killer tee
+				x -= 24.0f;
+				render_tee(ANIMSTATE::get_idle(), &killer, EMOTE_ANGRY, vec2(1,0), vec2(x, y+28));
+				x -= 32.0f;
+
+				// render killer name
+				x -= killername_w;
+				gfx_text(0, x, y, font_size, gameclient.clients[killmsgs[r].killer].name, -1);
+			}
+
+			y += 44;
 		}
-
-		y += 44;
 	}
 }

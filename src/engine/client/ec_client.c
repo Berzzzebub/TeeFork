@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <time.h>
 
 #include <base/system.h>
 #include <engine/e_engine.h>
@@ -574,8 +575,22 @@ static void client_set_state(int s)
 	if(config.debug)
 		dbg_msg("client", "state change. last=%d current=%d", state, s);
 	state = s;
+
 	if(old != s)
 		modc_statechange(state, old);
+}
+
+void teecomp_demo_start()
+{
+	char filename[512];
+	time_t rawtime;
+	struct tm *tmp;
+
+	time(&rawtime);
+	tmp = localtime(&rawtime);
+
+	str_format(filename, sizeof(filename), "demos/%d-%02d-%d_%02d-%02d-%02d_%s.demo", tmp->tm_year + 1900, tmp->tm_mon + 1, tmp->tm_mday, tmp->tm_hour, tmp->tm_min, tmp->tm_sec, current_map);
+	demorec_record_start(filename, modc_net_version(), current_map, current_map_crc, "client");
 }
 
 /* called when the map is loaded and we should init for a new round */
@@ -1349,6 +1364,7 @@ static void client_process_packet(NETCHUNK *packet)
 
 int client_mapdownload_amount() { return mapdownload_amount; }
 int client_mapdownload_totalsize() { return mapdownload_totalsize; }
+const char *client_mapdownload_name() { return mapdownload_name; }
 
 static void client_pump_network()
 {
@@ -1900,6 +1916,25 @@ static void con_addfavorite(void *result, void *user_data)
 		client_serverbrowse_addfavorite(addr);
 }
 
+const char *client_demo_record(const char *name)
+{
+	char filename[512];
+	str_format(filename, sizeof(filename), "demos/%s_%s.demo", current_map, name);
+	
+	if(state != CLIENTSTATE_ONLINE)
+		dbg_msg("demorec/record", "client is not online");
+	else
+		demorec_record_start(filename, modc_net_version(), current_map, current_map_crc, "client");
+	
+	return current_map;
+}
+
+void client_demo_record_stop()
+{
+	if(demorec_isrecording())
+		demorec_record_stop();
+}
+
 void client_demoplayer_play(const char *filename)
 {
 	int crc;
@@ -1960,6 +1995,24 @@ static void con_record(void *result, void *user_data)
 	}
 }
 
+static void con_tmprec(void *result, void *user_data)
+{
+	if(state != CLIENTSTATE_ONLINE)
+		dbg_msg("demorec/record", "client is not online");
+	else
+	{
+		char filename[512];
+		time_t rawtime;
+		struct tm *tmp;
+
+		time(&rawtime);
+		tmp = localtime(&rawtime);
+
+		str_format(filename, sizeof(filename), "demos/%d%02d%d_%d%d%d.demo", tmp->tm_year + 1900, tmp->tm_mon + 1, tmp->tm_mday, tmp->tm_hour, tmp->tm_min, tmp->tm_sec);
+		demorec_record_start(filename, modc_net_version(), current_map, current_map_crc, "client");
+	}
+}
+
 static void con_stoprecord(void *result, void *user_data)
 {
 	demorec_record_stop();
@@ -1983,6 +2036,7 @@ static void client_register_commands()
 
 	MACRO_REGISTER_COMMAND("play", "r", CFGFLAG_CLIENT, con_play, 0x0, "Play the file specified");
 	MACRO_REGISTER_COMMAND("record", "s", CFGFLAG_CLIENT, con_record, 0, "Record to the file");
+	MACRO_REGISTER_COMMAND("tmprec", "", CFGFLAG_CLIENT, con_tmprec, 0, "Temp Record");
 	MACRO_REGISTER_COMMAND("stoprecord", "", CFGFLAG_CLIENT, con_stoprecord, 0, "Stop recording");
 
 	MACRO_REGISTER_COMMAND("add_favorite", "s", CFGFLAG_CLIENT, con_addfavorite, 0x0, "Add a server as a favorite");

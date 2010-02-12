@@ -523,6 +523,9 @@ int client_mapdownload_amount();
 	See Also:
 		<other_func>
 */
+
+const char *client_mapdownload_name();
+
 int client_mapdownload_totalsize();
 
 /*
@@ -567,6 +570,9 @@ typedef struct DEMOPLAYBACK_INFO
 	float speed;
 } DEMOPLAYBACK_INFO;
 
+const char *client_demo_record(const char *filename);
+void client_demo_record_stop();
+
 void client_demoplayer_play(const char *filename);
 const DEMOPLAYBACK_INFO *client_demoplayer_getinfo();
 void client_demoplayer_setpos(float percent);
@@ -576,4 +582,7 @@ const char *client_user_directory();
 void client_serverinfo(SERVER_INFO *serverinfo);
 void client_serverinfo_request();
 void client_serverbrowse_request(NETADDR *addr);
+
+void teecomp_demo_start();
+
 #endif

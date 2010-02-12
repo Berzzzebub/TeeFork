@@ -35,7 +35,8 @@ struct INPUTSET
 static void con_key_input_set(void *result, void *user_data)
 {
 	INPUTSET *set = (INPUTSET *)user_data;
-	*set->variable = console_arg_int(result, 0) ? *set->variable = set->value : 0;
+	if(console_arg_int(result, 0)) 
+		*set->variable = set->value;
 }
 
 static void con_key_input_nextprev_weapon(void *result, void *user_data)
@@ -104,6 +105,14 @@ int CONTROLS::snapinput(int *data)
 		input_direction_left = 0;
 		input_direction_right = 0;
 			
+		// Keep following while chatting/in console/in menu
+		if(gameclient.snap.spectate && !gameclient.freeview)
+		{
+			input_data.target_x = (int)mouse_pos.x;
+			input_data.target_y = (int)mouse_pos.y;
+			send = true;
+		}
+
 		mem_copy(data, &input_data, sizeof(input_data));
 
 		// send once a second just to be sure
@@ -189,11 +198,15 @@ bool CONTROLS::on_mousemove(float x, float y)
 
 	if(gameclient.snap.spectate)
 	{
-		if(mouse_pos.x < 200.0f) mouse_pos.x = 200.0f;
-		if(mouse_pos.y < 200.0f) mouse_pos.y = 200.0f;
-		if(mouse_pos.x > col_width()*32-200.0f) mouse_pos.x = col_width()*32-200.0f;
-		if(mouse_pos.y > col_height()*32-200.0f) mouse_pos.y = col_height()*32-200.0f;
-		
+		if(gameclient.freeview)
+		{
+			if(mouse_pos.x < 200.0f) mouse_pos.x = 200.0f;
+			if(mouse_pos.y < 200.0f) mouse_pos.y = 200.0f;
+			if(mouse_pos.x > col_width()*32-200.0f) mouse_pos.x = col_width()*32-200.0f;
+			if(mouse_pos.y > col_height()*32-200.0f) mouse_pos.y = col_height()*32-200.0f;			
+		}
+		else
+			mouse_pos = gameclient.spectate_pos;	
 		target_pos = mouse_pos;
 	}
 	else

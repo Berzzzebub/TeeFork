@@ -14,7 +14,7 @@ MACRO_CONFIG_INT(cl_editor, 0, 0, 1, CFGFLAG_CLIENT, "")
 
 MACRO_CONFIG_INT(cl_eventthread, 0, 0, 1, CFGFLAG_CLIENT, "Enables the usage of a thread to pump the events")
 
-MACRO_CONFIG_INT(inp_grab, 0, 0, 1, CFGFLAG_CLIENT, "Use forceful input grabbing method")
+MACRO_CONFIG_INT(inp_grab, 0, 0, 1, CFGFLAG_SAVE|CFGFLAG_CLIENT, "Use forceful input grabbing method")
 
 MACRO_CONFIG_STR(b_filter_string, 64, "", CFGFLAG_SAVE|CFGFLAG_CLIENT, "Server browser filtering string")
 

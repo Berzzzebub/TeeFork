@@ -149,7 +149,7 @@ int SKINS::find(const char *name)
 }
 
 // these converter functions were nicked from some random internet pages
-static float hue_to_rgb(float v1, float v2, float h)
+inline float SKINS::hue_to_rgb(float v1, float v2, float h)
 {
    if(h < 0) h += 1;
    if(h > 1) h -= 1;
@@ -159,7 +159,7 @@ static float hue_to_rgb(float v1, float v2, float h)
    return v1;
 }
 
-static vec3 hsl_to_rgb(vec3 in)
+inline vec3 SKINS::hsl_to_rgb(vec3 in)
 {
 	float v1, v2;
 	vec3 out;

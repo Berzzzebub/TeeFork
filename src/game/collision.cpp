@@ -35,6 +35,8 @@ int col_init()
 			tiles[i].index = COLFLAG_SOLID;
 		else if(index == TILE_NOHOOK)
 			tiles[i].index = COLFLAG_SOLID|COLFLAG_NOHOOK;
+		else if((index == TILE_BEGIN) || (index == TILE_END))
+			continue;
 		else
 			tiles[i].index = 0;
 	}
@@ -50,7 +52,10 @@ int col_get(int x, int y)
 	
 	if(tiles[ny*width+nx].index > 128)
 		return 0;
-	return tiles[ny*width+nx].index;
+	if(tiles[ny*width+nx].index == COLFLAG_SOLID || tiles[ny*width+nx].index == (COLFLAG_SOLID|COLFLAG_NOHOOK) || tiles[ny*width+nx].index == COLFLAG_DEATH)
+		return tiles[ny*width+nx].index;
+	else
+		return 0;
 }
 
 int col_is_solid(int x, int y)
@@ -58,6 +63,26 @@ int col_is_solid(int x, int y)
 	return col_get(x,y)&COLFLAG_SOLID;
 }
 
+//race
+int col_is_begin(int x, int y)
+{
+	int nx = x/32;
+	int ny = y/32;
+	if(y<0 || nx < 0 || nx >= width || ny >= height)
+		return 0;
+	
+	return tiles[ny*width+nx].index == TILE_BEGIN;
+}
+
+int col_is_end(int x, int y)
+{
+	int nx = x/32;
+	int ny = y/32;
+	if(y<0 || nx < 0 || nx >= width || ny >= height)
+		return 0;
+	
+	return tiles[ny*width+nx].index == TILE_END;
+}
 
 // TODO: rewrite this smarter!
 int col_intersect_line(vec2 pos0, vec2 pos1, vec2 *out_collision, vec2 *out_before_collision)

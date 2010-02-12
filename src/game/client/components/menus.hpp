@@ -3,6 +3,12 @@
 #include <game/client/component.hpp>
 #include <game/client/ui.hpp>
 
+typedef struct 
+{
+	const char *name;
+	const char *command;
+	int keyid;
+} KEYINFO;
 
 // compnent to fetch keypresses, override all other input
 class MENUS_KEYBINDER : public COMPONENT
@@ -118,7 +124,7 @@ class MENUS : public COMPONENT
 	int callvote_selectedplayer;
 	
 	// demo
-	struct DEMOITEM
+	/*struct DEMOITEM
 	{
 		char filename[512];
 		char name[256];
@@ -127,7 +133,7 @@ class MENUS : public COMPONENT
 	DEMOITEM *demos;
 	int num_demos;
 		
-	void demolist_populate();
+	void demolist_populate();*/
 	static void demolist_count_callback(const char *name, int is_dir, void *user);
 	static void demolist_fetch_callback(const char *name, int is_dir, void *user);
 
@@ -161,13 +167,36 @@ class MENUS : public COMPONENT
 	void render_settings_controls(RECT main_view);
 	void render_settings_graphics(RECT main_view);
 	void render_settings_sound(RECT main_view);
+	void render_settings_downloadextension(RECT main_view);
+	void render_settings_beep(RECT main_view);
+	void render_settings_hudmod(RECT main_view);
 	void render_settings(RECT main_view);
+	
+	// TeeComp related
+	void render_rgb_sliders(RECT* main_view, RECT* button, int &r, int &g, int &b, bool enabled);
+	void ui_do_keybinder(KEYINFO& key, RECT* r);
+	void render_settings_teecomp(RECT main_view);
+	void render_settings_teecomp_skins(RECT main_view);
+	void render_settings_teecomp_stats(RECT main_view);
+	void render_settings_teecomp_misc(RECT main_view);
+	void render_settings_teecomp_about(RECT main_view);
 	
 	void set_active(bool active);
 public:
 	static MENUS_KEYBINDER binder;
 	
 	MENUS();
+	
+	struct DEMOITEM
+	{
+		char filename[512];
+		char name[256];
+	};
+	
+	DEMOITEM *demos;
+	int num_demos;
+		
+	void demolist_populate();
 
 	void render_loading(float percent);
 
@@ -180,4 +209,15 @@ public:
 	virtual void on_render();
 	virtual bool on_input(INPUT_EVENT e);
 	virtual bool on_mousemove(float x, float y);
+	
+	//DownloadExtension
+	struct
+	{
+		char extra_text[512];
+		int tick;
+		int elapsedsec;
+		int elapsedtick;
+		float speed;
+		float timeneeded;
+	} download;
 };

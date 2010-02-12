@@ -13,6 +13,8 @@
 #include <game/client/gameclient.hpp>
 #include <game/client/animstate.hpp>
 
+#include <game/client/teecomp.hpp>
+
 #include "menus.hpp"
 #include "motd.hpp"
 #include "voting.hpp"
@@ -49,12 +51,17 @@ void MENUS::render_game(RECT main_view)
 		
 		if(gameclient.snap.gameobj->flags & GAMEFLAG_TEAMS)
 		{
+			char buf[32];
 			if(gameclient.snap.local_info->team != 0)
 			{
 				ui_vsplit_l(&main_view, 10.0f, &button, &main_view);
 				ui_vsplit_l(&main_view, 120.0f, &button, &main_view);
 				static int spectate_button = 0;
-				if(ui_do_button(&spectate_button, "Join Red", 0, &button, ui_draw_menu_button, 0))
+				if(gameclient.snap.local_info->team == -1 || config.tc_colored_tees_method == 0)
+					str_format(buf, sizeof(buf), "Join %s", TeecompUtils::rgb_to_name(config.tc_colored_tees_team1));
+				else
+					str_format(buf, sizeof(buf), "Join %s", TeecompUtils::rgb_to_name(config.tc_colored_tees_team2));
+				if(ui_do_button(&spectate_button, buf, 0, &button, ui_draw_menu_button, 0))
 				{
 					gameclient.send_switch_team(0);
 					set_active(false);
@@ -66,7 +73,8 @@ void MENUS::render_game(RECT main_view)
 				ui_vsplit_l(&main_view, 10.0f, &button, &main_view);
 				ui_vsplit_l(&main_view, 120.0f, &button, &main_view);
 				static int spectate_button = 0;
-				if(ui_do_button(&spectate_button, "Join Blue", 0, &button, ui_draw_menu_button, 0))
+				str_format(buf, sizeof(buf), "Join %s", TeecompUtils::rgb_to_name(config.tc_colored_tees_team2));
+				if(ui_do_button(&spectate_button, buf, 0, &button, ui_draw_menu_button, 0))
 				{
 					gameclient.send_switch_team(1);
 					set_active(false);

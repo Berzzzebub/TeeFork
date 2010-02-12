@@ -11,6 +11,9 @@
 #include <game/client/components/effects.hpp>
 
 #include "items.hpp"
+#include "skins.hpp"
+
+#include <game/client/teecomp.hpp>
 
 void ITEMS::render_projectile(const NETOBJ_PROJECTILE *current, int itemid)
 {
@@ -121,9 +124,22 @@ void ITEMS::render_flag(const NETOBJ_FLAG *prev, const NETOBJ_FLAG *current)
 	float angle = 0.0f;
 	float size = 42.0f;
 
+	if(gameclient.snap.local_info && current->carried_by == gameclient.snap.local_info->cid && config.tc_hide_carrying)
+		return;
+
 	gfx_blend_normal();
-	gfx_texture_set(data->images[IMAGE_GAME].id);
+	if(config.tc_colored_flags)
+		gfx_texture_set(data->images[IMAGE_GAME_GRAY].id);
+	else
+		gfx_texture_set(data->images[IMAGE_GAME].id);
 	gfx_quads_begin();
+
+	if(config.tc_colored_flags && gameclient.snap.local_info)
+	{
+		vec3 col = TeecompUtils::getTeamColor(current->team, gameclient.snap.local_info->team,
+			config.tc_colored_tees_team1, config.tc_colored_tees_team2, config.tc_colored_tees_method);
+		gfx_setcolor(col.r, col.g, col.b, 1.0f);
+	}
 
 	if(current->team == 0) // red team
 		select_sprite(SPRITE_FLAG_RED);
@@ -183,7 +199,8 @@ void ITEMS::render_laser(const struct NETOBJ_LASER *current)
 	// do inner	
 	vec4 inner_color(0.5f,0.5f,1.0f,1.0f);
 	out = vec2(dir.y, -dir.x) * (5.0f*ia);
-	gfx_setcolor(inner_color.r, inner_color.g, inner_color.b, 1.0f); // center
+	vec3 rgb = SKINS::hsl_to_rgb(vec3(config.cl_laser_inner_hue/255.0f, config.cl_laser_inner_sat/255.0f, config.cl_laser_inner_lht/255.0f));
+	gfx_setcolor(rgb.r, rgb.g, rgb.b,1.0f); // center
 	
 	gfx_quads_draw_freeform(
 			from.x-out.x, from.y-out.y,
@@ -205,7 +222,7 @@ void ITEMS::render_laser(const struct NETOBJ_LASER *current)
 		gfx_quads_setrotation(client_tick());
 		gfx_setcolor(outer_color.r,outer_color.g,outer_color.b,1.0f);
 		gfx_quads_draw(pos.x, pos.y, 24,24);
-		gfx_setcolor(inner_color.r, inner_color.g, inner_color.b, 1.0f);
+		gfx_setcolor(rgb.r, rgb.g, rgb.b,1.0f);
 		gfx_quads_draw(pos.x, pos.y, 20,20);
 		gfx_quads_end();
 	}

@@ -19,10 +19,15 @@ void CAMERA::on_render()
 {
 	//vec2 center;
 	zoom = 1.0f;
-
+	
 	// update camera center		
 	if(gameclient.snap.spectate)
-		center = gameclient.controls->mouse_pos;
+	{
+		if(gameclient.freeview)
+			center = gameclient.controls->mouse_pos;
+		else
+			center = gameclient.spectate_pos;
+	}
 	else
 	{
 

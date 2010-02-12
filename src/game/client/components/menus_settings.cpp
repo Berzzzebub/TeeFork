@@ -9,6 +9,8 @@
 #include <game/generated/g_protocol.hpp>
 #include <game/generated/gc_data.hpp>
 
+#include <game/version.hpp>
+
 #include <game/client/ui.hpp>
 #include <game/client/render.hpp>
 #include <game/client/gameclient.hpp>
@@ -17,6 +19,8 @@
 #include "binds.hpp"
 #include "menus.hpp"
 #include "skins.hpp"
+
+#include <game/client/teecomp.hpp>
 
 MENUS_KEYBINDER MENUS::binder;
 
@@ -53,7 +57,6 @@ void MENUS::render_settings_player(RECT main_view)
 
 	// render settings
 	{	
-		ui_hsplit_t(&main_view, 20.0f, &button, &main_view);
 		ui_do_label(&button, "Name:", 14.0, -1);
 		ui_vsplit_l(&button, 80.0f, 0, &button);
 		ui_vsplit_l(&button, 180.0f, &button, 0);
@@ -84,19 +87,54 @@ void MENUS::render_settings_player(RECT main_view)
 			config.cl_autoswitch_weapons ^= 1;
 			
 		ui_hsplit_t(&main_view, 20.0f, &button, &main_view);
+		if (ui_do_button(&config.cl_scoreboard_client_id, "Show Client ID in scoreboard", config.cl_scoreboard_client_id, &button, ui_draw_checkbox, 0))
+			config.cl_scoreboard_client_id ^= 1;
+			
+		ui_hsplit_t(&main_view, 20.0f, &button, &main_view);
+		if (ui_do_button(&config.cl_show_ghost, "Show ghost", config.cl_show_ghost, &button, ui_draw_checkbox, 0))
+			config.cl_show_ghost ^= 1;
+			
+		ui_hsplit_t(&main_view, 20.0f, &button, &main_view);
 		if (ui_do_button(&config.cl_nameplates, "Show name plates", config.cl_nameplates, &button, ui_draw_checkbox, 0))
 			config.cl_nameplates ^= 1;
 
-		//if(config.cl_nameplates)
+		if(config.cl_nameplates)
 		{
 			ui_hsplit_t(&main_view, 20.0f, &button, &main_view);
 			ui_vsplit_l(&button, 15.0f, 0, &button);
 			if (ui_do_button(&config.cl_nameplates_always, "Always show name plates", config.cl_nameplates_always, &button, ui_draw_checkbox, 0))
 				config.cl_nameplates_always ^= 1;
+				
+			ui_hsplit_t(&main_view, 20.0f, &button, &main_view);
+			ui_vsplit_l(&button, 15.0f, 0, &button);
+			if (ui_do_button(&config.cl_nameplate_client_id, "Client ID", config.cl_nameplate_client_id, &button, ui_draw_checkbox, 0))
+				config.cl_nameplate_client_id ^= 1;
 		}
+		else
+			ui_hsplit_t(&main_view, 40.0f, &button, &main_view);
 			
-		ui_hsplit_t(&main_view, 20.0f, &button, &main_view);
+		ui_hsplit_t(&main_view, 15.0f, &button, &main_view);
 		
+		ui_hsplit_t(&main_view, 20.0f, &button, &main_view);
+		if (ui_do_button(&config.cl_anti_rainbow, "Anti rainbow", config.cl_anti_rainbow, &button, ui_draw_checkbox, 0))
+			config.cl_anti_rainbow ^= 1;
+ 		
+		if(config.cl_anti_rainbow)
+		{
+			char buf[3];
+			str_format(buf, sizeof(buf), "%d", config.cl_anti_rainbow_count);
+			ui_hsplit_t(&main_view, 20.0f, &button, &main_view);
+			ui_do_label(&button, "Allowed color changes:", 14.0f, -1);
+			ui_vsplit_l(&button, 180.0f, 0, &button);
+			ui_vsplit_l(&button, 30.0f, &button, 0);
+			ui_do_edit_box(&config.cl_anti_rainbow_count, &button, buf, sizeof(buf), 14.0f);
+			config.cl_anti_rainbow_count = atoi(buf);
+		}
+		else
+			ui_hsplit_t(&main_view, 20.0f, &button, &main_view);
+			
+		ui_hsplit_t(&main_view, 15.0f, &button, &main_view);
+
 		ui_hsplit_t(&main_view, 20.0f, &button, &main_view);
 		if (ui_do_button(&config.player_color_body, "Custom colors", config.player_use_custom_color, &button, ui_draw_checkbox, 0))
 		{
@@ -149,7 +187,37 @@ void MENUS::render_settings_player(RECT main_view)
 			}
 		}
 	}
+	
+	RECT text;
+	ui_hsplit_t(&main_view, 10.0f, 0, &main_view);
+	//ui_vsplit_l(&text, 15.0f, 0, &text);
+	ui_do_label(&main_view, "Laser Color", 14.0f, -1);
+	
+	ui_hsplit_t(&main_view, 20.0f, 0, &main_view);
+	const char *labels[] = {"Hue", "Sat.", "Lht."};
+	int *color_slider[3] = {&config.cl_laser_inner_hue, &config.cl_laser_inner_sat, &config.cl_laser_inner_lht};
+	for(int s = 0; s < 3; s++)
+	{
+		RECT text;
+		ui_hsplit_t(&main_view, 19.0f, &button, &main_view);
+		ui_vmargin(&button, 15.0f, &button);
+		ui_vsplit_l(&button, 50.0f, &text, &button);
+		ui_vsplit_r(&button, 5.0f, &button, 0);
+		ui_hsplit_t(&button, 4.0f, 0, &button);
 		
+		float k = (*color_slider[s]) / 255.0f;
+		k = ui_do_scrollbar_h(color_slider[s], &button, k);
+		*color_slider[s] = (int)(k*255.0f);
+		ui_do_label(&text, labels[s], 15.0f, -1);
+	}	
+	ui_hsplit_t(&main_view, 25.0f, &button, &main_view);
+	ui_vmargin(&button, 15.0f, &button);
+	ui_hsplit_t(&button, 20.0f, 0, &button);
+	ui_vmargin(&text, 15.0f, &text);
+	ui_hsplit_b(&button, 20.0f, 0, &button);
+	vec3 rgb = SKINS::hsl_to_rgb(vec3(config.cl_laser_inner_hue/255.0f, config.cl_laser_inner_sat/255.0f, config.cl_laser_inner_lht/255.0f));
+	ui_draw_rect(&button, vec4(rgb.r, rgb.g, rgb.b,1.0f), CORNER_ALL, 5.0f);
+
 	// draw header
 	RECT header, footer;
 	ui_hsplit_t(&skinselection, 20, &header, &skinselection);
@@ -240,13 +308,6 @@ void MENUS::render_settings_player(RECT main_view)
 }
 
 typedef void (*assign_func_callback)(CONFIGURATION *config, int value);
-
-typedef struct 
-{
-	const char *name;
-	const char *command;
-	int keyid;
-} KEYINFO;
 
 KEYINFO keys[] = 
 {
@@ -621,6 +682,206 @@ static void menu2_render_settings_network(RECT main_view)
 	}
 }*/
 
+void MENUS::render_settings_beep(RECT main_view)
+{
+	RECT button;
+	
+	ui_vsplit_l(&main_view, 300.0f, &main_view, 0);
+	
+	ui_hsplit_t(&main_view, 20.0f, &button, &main_view);
+	if (ui_do_button(&config.cl_change_sound, "Change chat sound", config.cl_change_sound, &button, ui_draw_checkbox, 0))
+		config.cl_change_sound ^= 1;
+	ui_hsplit_t(&main_view, 20.0f, &button, &main_view);
+	if (ui_do_button(&config.cl_change_color, "Change color of chat messages", config.cl_change_color, &button, ui_draw_checkbox, 0))
+		config.cl_change_color ^= 1;
+	ui_hsplit_t(&main_view, 20.0f, &button, &main_view);
+	if (ui_do_button(&config.cl_block_spammer, "Block all messages from spaming people", config.cl_block_spammer, &button, ui_draw_checkbox, 0))
+		config.cl_block_spammer ^= 1;
+	ui_hsplit_t(&main_view, 20.0f, &button, &main_view);
+	if (ui_do_button(&config.cl_anti_spam, "Block spam", config.cl_anti_spam, &button, ui_draw_checkbox, 0))
+		config.cl_anti_spam ^= 1;
+		
+	ui_hsplit_t(&main_view, 10.0f, &button, &main_view);
+	
+	ui_hsplit_t(&main_view, 20.0f, &button, &main_view);
+	ui_do_label(&button, "Search for names:", 14.0, -1);
+	ui_vsplit_l(&button, 140.0f, 0, &button);
+	ui_vsplit_l(&button, 380.0f, &button, 0);
+	ui_do_edit_box(config.cl_search_name, &button, config.cl_search_name, sizeof(config.cl_search_name), 14.0f);
+	
+	ui_hsplit_t(&main_view, 5.0f, &button, &main_view);
+	
+	ui_hsplit_t(&main_view, 20.0f, &button, &main_view);
+	ui_do_label(&button, "Spammer names:", 14.0, -1);
+	ui_vsplit_l(&button, 140.0f, 0, &button);
+	ui_vsplit_l(&button, 380.0f, &button, 0);
+	ui_do_edit_box(config.cl_spammer_name, &button, config.cl_spammer_name, sizeof(config.cl_spammer_name), 14.0f);
+ 
+	// information text
+	ui_hsplit_b(&main_view, 25.0f, &main_view, &button);
+	ui_do_label(&button, "Enter the names u want to look for.\nSeperate them with a simple space.", 14.0f, -1);
+
+	ui_hsplit_b(&main_view, -10.0f, &main_view, &button);
+	ui_vsplit_l(&button, main_view.w*4.1, 0, &button);
+	ui_do_label(&button, "by Sushi :)", 10.0f, 0);
+}
+
+void MENUS::render_settings_hudmod(RECT main_view)
+{
+	RECT button, text, right_view;
+	ui_vsplit_l(&main_view, 300.0f, &main_view, &right_view);
+	
+	// general settings
+	ui_hsplit_t(&main_view, 15.0f, &text, &main_view);
+	ui_do_label(&text, "General settings", 14.0f, -1);
+		
+	ui_hsplit_t(&main_view, 10.0f, &button, &main_view);
+	
+	ui_hsplit_t(&main_view, 20.0f, &button, &main_view);
+	if (ui_do_button(&config.cl_clear_hud, "Clear hud", config.cl_clear_hud, &button, ui_draw_checkbox, 0))
+		config.cl_clear_hud ^= 1;
+	ui_hsplit_t(&main_view, 20.0f, &button, &main_view);
+	if (ui_do_button(&config.cl_clear_all, "Clear all", config.cl_clear_all, &button, ui_draw_checkbox, 0))
+		config.cl_clear_all ^= 1;
+		
+	ui_hsplit_t(&main_view, 40.0f, &button, &main_view);
+
+	// special settings
+	if(!config.cl_clear_all)
+	{
+		ui_hsplit_t(&main_view, 15.0f, &text, &main_view);
+		ui_do_label(&text, "Special settings", 14.0f, -1);
+		
+		ui_hsplit_t(&main_view, 10.0f, &button, &main_view);
+		
+		if(!config.cl_clear_hud)
+		{
+			ui_hsplit_t(&main_view, 20.0f, &button, &main_view);
+			if (ui_do_button(&config.cl_render_time, "Server time", config.cl_render_time, &button, ui_draw_checkbox, 0))
+				config.cl_render_time ^= 1;
+			ui_hsplit_t(&main_view, 20.0f, &button, &main_view);	
+			if (ui_do_button(&config.cl_render_hp, "Health", config.cl_render_hp, &button, ui_draw_checkbox, 0))
+				config.cl_render_hp ^= 1;
+			ui_hsplit_t(&main_view, 20.0f, &button, &main_view);
+			if (ui_do_button(&config.cl_render_ammo, "Ammunition", config.cl_render_ammo, &button, ui_draw_checkbox, 0))
+				config.cl_render_ammo ^= 1;
+			ui_hsplit_t(&main_view, 20.0f, &button, &main_view);
+			if (ui_do_button(&config.cl_render_crosshair, "Crosshair", config.cl_render_crosshair, &button, ui_draw_checkbox, 0))
+				config.cl_render_crosshair ^= 1;
+			ui_hsplit_t(&main_view, 20.0f, &button, &main_view);
+			if (ui_do_button(&config.cl_render_score, "Team score", config.cl_render_score, &button, ui_draw_checkbox, 0))
+				config.cl_render_score ^= 1;
+			ui_hsplit_t(&main_view, 20.0f, &button, &main_view);
+			if (ui_do_button(&config.cl_showfps, "FPS", config.cl_showfps, &button, ui_draw_checkbox, 0))
+				config.cl_showfps ^= 1;
+			ui_hsplit_t(&main_view, 20.0f, &button, &main_view);
+			if (ui_do_button(&config.cl_render_viewmode, "Viewmode", config.cl_render_viewmode, &button, ui_draw_checkbox, 0))
+				config.cl_render_viewmode ^= 1;					
+		}
+		ui_hsplit_t(&main_view, 20.0f, &button, &main_view);
+		if (ui_do_button(&config.cl_render_scoreboard, "Scoreboard", config.cl_render_scoreboard, &button, ui_draw_checkbox, 0))
+			config.cl_render_scoreboard ^= 1;
+		ui_hsplit_t(&main_view, 20.0f, &button, &main_view);
+		if (ui_do_button(&config.cl_render_warmup, "Warmup", config.cl_render_warmup, &button, ui_draw_checkbox, 0))
+			config.cl_render_warmup ^= 1;
+		ui_hsplit_t(&main_view, 20.0f, &button, &main_view);
+		if (ui_do_button(&config.cl_render_broadcast, "Broadcast", config.cl_render_broadcast, &button, ui_draw_checkbox, 0))
+			config.cl_render_broadcast ^= 1;
+		ui_hsplit_t(&main_view, 20.0f, &button, &main_view);
+		if (ui_do_button(&config.cl_render_servermsg, "Server messages", config.cl_render_servermsg, &button, ui_draw_checkbox, 0))
+			config.cl_render_servermsg ^= 1;
+		ui_hsplit_t(&main_view, 20.0f, &button, &main_view);
+		if (ui_do_button(&config.cl_render_chat, "Chat", config.cl_render_chat, &button, ui_draw_checkbox, 0))
+			config.cl_render_chat ^= 1;
+		ui_hsplit_t(&main_view, 20.0f, &button, &main_view);
+		if (ui_do_button(&config.cl_render_kill, "Kill messages", config.cl_render_kill, &button, ui_draw_checkbox, 0))
+			config.cl_render_kill ^= 1;
+		ui_hsplit_t(&main_view, 20.0f, &button, &main_view);
+		if (ui_do_button(&config.cl_render_vote, "Votes", config.cl_render_vote, &button, ui_draw_checkbox, 0))
+			config.cl_render_vote ^= 1;
+		ui_hsplit_t(&main_view, 20.0f, &button, &main_view);
+		if (ui_do_button(&config.cl_warning_teambalance, "Team balance warning", config.cl_warning_teambalance, &button, ui_draw_checkbox, 0))
+			config.cl_warning_teambalance ^= 1;
+	}
+	
+	// sound settings
+	ui_hsplit_t(&right_view, 15.0f, &text, &right_view);
+	ui_do_label(&text, "Sound settings", 14.0f, -1);
+	
+	ui_hsplit_t(&right_view, 10.0f, &button, &right_view);
+
+	ui_hsplit_t(&right_view, 20.0f, &button, &right_view);
+	if (ui_do_button(&config.cl_servermsgsound, "Activate server message sound", config.cl_servermsgsound, &button, ui_draw_checkbox, 0))
+		config.cl_servermsgsound ^= 1;
+	ui_hsplit_t(&right_view, 20.0f, &button, &right_view);
+	if (ui_do_button(&config.cl_chatsound, "Activate chat message sound", config.cl_chatsound, &button, ui_draw_checkbox, 0))
+		config.cl_chatsound ^= 1;
+	
+	// default button
+	ui_hsplit_b(&main_view, 20.0f, 0, &button);
+	static int default_button = 0;
+	if(ui_do_button((void*)&default_button, "Reset to defaults", 0, &button, ui_draw_menu_button, 0))
+	{
+		config.cl_render_time = 1;
+		config.cl_render_warmup = 1;
+		config.cl_render_broadcast = 1;
+		config.cl_render_hp = 1;
+		config.cl_render_ammo = 1;
+		config.cl_render_crosshair = 1;
+		config.cl_render_score = 1;
+		config.cl_showfps = 0;
+		config.cl_render_scoreboard = 1;
+		config.cl_render_servermsg = 1;
+		config.cl_render_chat = 1;
+		config.cl_render_kill = 1;
+		config.cl_render_vote = 1;
+		config.cl_clear_hud = 0;
+		config.cl_clear_all = 0;
+		config.cl_servermsgsound = 1;
+		config.cl_chatsound = 1;
+		config.cl_warning_teambalance = 1;
+	}
+	
+	// information text
+	ui_hsplit_b(&main_view, 15.0f, &main_view, &button);
+	ui_vsplit_l(&button, main_view.w*4.1, 0, &button);
+	ui_do_label(&button, "by Sushi :)", 10.0f, 0);
+}
+
+void MENUS::render_settings_downloadextension(RECT main_view)
+{
+	RECT button, text;
+	ui_hsplit_t(&main_view, 10.0f, &text, &main_view);
+	ui_do_label(&text, "DownloadExtension", 40.0f, -1);
+	ui_hsplit_t(&main_view, 40.0f, 0, &main_view);
+	ui_hsplit_t(&main_view, 10.0f, &text, &main_view);
+	ui_do_label(&text, "Version: 1.1", 15.0f, -1);
+	ui_hsplit_t(&main_view, 10.0f, 0, &main_view);
+	ui_hsplit_t(&main_view, 10.0f, &text, &main_view);
+	ui_do_label(&text, "Mod by KillaBilla", 15.0f, -1);
+	ui_hsplit_t(&main_view, 50.0f, 0, &main_view);
+	ui_hsplit_t(&main_view, 10.0f, &text, &main_view);
+	ui_do_label(&text, "Progressbarcolor:", 25.0f, -1);
+	ui_hsplit_t(&main_view, 20.0f, 0, &main_view);
+	const char *labels[] = {"Red", "Green", "Blue", "Alpha"};
+	int *color_slider[4] = {&config.cl_downloadextension_statusbar_r, &config.cl_downloadextension_statusbar_g, &config.cl_downloadextension_statusbar_b, &config.cl_downloadextension_statusbar_a};
+	for(int s = 0; s < 4; s++)
+	{
+		RECT text;
+		ui_hsplit_t(&main_view, 19.0f, &button, &main_view);
+		ui_vmargin(&button, 15.0f, &button);
+		ui_vsplit_l(&button, 50.0f, &text, &button);
+		ui_vsplit_r(&button, 5.0f, &button, 0);
+		ui_hsplit_t(&button, 4.0f, 0, &button);
+		
+		float k = (*color_slider[s]) / 255.0f;
+		k = ui_do_scrollbar_h(color_slider[s], &button, k);
+		*color_slider[s] = (int)(k*255.0f);
+		ui_do_label(&text, labels[s], 15.0f, -1);
+	}
+	
+}
+
 void MENUS::render_settings(RECT main_view)
 {
 	static int settings_page = 0;
@@ -636,7 +897,7 @@ void MENUS::render_settings(RECT main_view)
 	
 	RECT button;
 	
-	const char *tabs[] = {"Player", "Controls", "Graphics", "Sound"};
+	const char *tabs[] = {"Player", "Controls", "Graphics", "Sound", "TeeComp", "Beep", "Hud-Mod", "Dl.Ext."};
 	int num_tabs = (int)(sizeof(tabs)/sizeof(*tabs));
 
 	for(int i = 0; i < num_tabs; i++)
@@ -657,8 +918,16 @@ void MENUS::render_settings(RECT main_view)
 		render_settings_graphics(main_view);
 	else if(settings_page == 3)
 		render_settings_sound(main_view);
+	else if(settings_page == 4)
+		render_settings_teecomp(main_view);
+	else if(settings_page == 5)
+		render_settings_beep(main_view);
+	else if(settings_page == 6)
+		render_settings_hudmod(main_view);
+	else if(settings_page == 7)
+		render_settings_downloadextension(main_view);
 
-	if(need_restart)
+	if(need_restart && settings_page != 4)
 	{
 		RECT restart_warning;
 		ui_hsplit_b(&main_view, 40, &main_view, &restart_warning);

@@ -35,6 +35,9 @@
 #include "components/skins.hpp"
 #include "components/sounds.hpp"
 #include "components/voting.hpp"
+#include "components/teecomp_stats.hpp"
+#include "components/race_demo.hpp"
+#include <game/client/teecomp.hpp>
 
 GAMECLIENT gameclient;
 
@@ -59,7 +62,8 @@ static SOUNDS sounds;
 static EMOTICON emoticon;
 static DAMAGEIND damageind;
 static VOTING voting;
-
+static TEECOMP_STATS teecomp_stats;
+static RACE race;
 static PLAYERS players;
 static NAMEPLATES nameplates;
 static ITEMS items;
@@ -115,6 +119,8 @@ void GAMECLIENT::on_console_init()
 	damageind = &::damageind;
 	mapimages = &::mapimages;
 	voting = &::voting;
+	teecomp_stats = &::teecomp_stats;
+	race = &::race;
 	
 	// make a list of all the systems, make sure to add them in the corrent render order
 	all.add(skins);
@@ -144,6 +150,7 @@ void GAMECLIENT::on_console_init()
 	all.add(&broadcast);
 	all.add(&debughud);
 	all.add(&scoreboard);
+	all.add(teecomp_stats);
 	all.add(motd);
 	all.add(menus);
 	all.add(console);
@@ -158,6 +165,8 @@ void GAMECLIENT::on_console_init()
 	input.add(&emoticon);
 	input.add(controls);
 	input.add(binds);
+	
+	all.add(race);
 		
 	// add the some console commands
 	MACRO_REGISTER_COMMAND("team", "i", CFGFLAG_CLIENT, con_team, this, "Switch team");
@@ -233,6 +242,75 @@ void GAMECLIENT::on_init()
 	dbg_msg("", "%f.2ms", ((end-start)*1000)/(float)time_freq());
 	
 	servermode = SERVERMODE_PURE;
+
+	// Teecomp grayscale flags
+	gfx_unload_texture(data->images[IMAGE_GAME_GRAY].id); // Already loaded with full color, unload
+	data->images[IMAGE_GAME_GRAY].id = -1;
+
+	IMAGE_INFO info;
+	if(!gfx_load_png(&info, data->images[IMAGE_GAME_GRAY].filename))
+		return;
+
+	unsigned char *d = (unsigned char *)info.data;
+	int step = info.format == IMG_RGBA ? 4 : 3;
+
+	for(int i=0; i < info.width*info.height; i++)
+	{
+		int v = (d[i*step]+d[i*step+1]+d[i*step+2])/3;
+		d[i*step] = v;
+		d[i*step+1] = v;
+		d[i*step+2] = v;
+	}
+
+	int freq[256];
+	int org_weight;
+	int new_weight;
+	int flag_x = 384;
+	int flag_y = 256;
+	int flag_w = 128;
+	int flag_h = 256;
+	int pitch = info.width*4;
+
+	for(int f=0; f<2; f++)
+	{
+		org_weight = 0;
+		new_weight = 192;
+		for(int i=0; i<256; i++)
+			freq[i] = 0;
+
+		// find most common frequence
+		for(int y=flag_y; y<flag_y+flag_h; y++)
+			for(int x=flag_x+flag_w*f; x<flag_x+flag_w*(1+f); x++)
+			{
+				if(d[y*pitch+x*4+3] > 128)
+					freq[d[y*pitch+x*4]]++;
+			}
+		
+		for(int i = 1; i < 256; i++)
+		{
+			if(freq[org_weight] < freq[i])
+				org_weight = i;
+		}
+
+		// reorder
+		int inv_org_weight = 255-org_weight;
+		int inv_new_weight = 255-new_weight;
+		for(int y=flag_y; y<flag_y+flag_h; y++)
+			for(int x=flag_x+flag_w*f; x<flag_x+flag_w*(1+f); x++)
+			{
+				int v = d[y*pitch+x*4];
+				if(v <= org_weight*1.25f) // modified for contrast
+					v = (int)(((v/(float)org_weight) * new_weight));
+				else
+					v = (int)(((v-org_weight)/(float)inv_org_weight)*inv_new_weight + new_weight);
+				d[y*pitch+x*4] = v;
+				d[y*pitch+x*4+1] = v;
+				d[y*pitch+x*4+2] = v;
+			}
+	}
+
+	data->images[IMAGE_GAME_GRAY].id = gfx_load_texture_raw(info.width, info.height, info.format, info.data, info.format, 0);
+	mem_free(info.data);
 }
 
 void GAMECLIENT::on_save()
@@ -246,7 +324,7 @@ void GAMECLIENT::dispatch_input()
 	// handle mouse movement
 	int x=0, y=0;
 	inp_mouse_relative(&x, &y);
-	if(x || y)
+	if(x || y || !freeview)
 	{
 		for(int h = 0; h < input.num; h++)
 		{
@@ -277,7 +355,31 @@ void GAMECLIENT::dispatch_input()
 
 int GAMECLIENT::on_snapinput(int *data)
 {
-	return controls->snapinput(data);
+	int val = controls->snapinput(data);
+	if(val && snap.spectate)
+	{
+		NETOBJ_PLAYER_INPUT *inp = (NETOBJ_PLAYER_INPUT *)data;
+		static bool last_fire = false, last_hook = false;
+
+		if(inp->fire&1 && !last_fire)
+		{
+			find_next_spectable_cid();
+			last_fire = true;
+		}
+		else if(!(inp->fire&1) && last_fire)
+			last_fire = false;
+
+		if(inp->hook && !last_hook)
+		{
+			freeview = !freeview;
+			if(!freeview)
+				find_next_spectable_cid();
+			last_hook = true;
+		}
+		else if(!inp->hook && last_hook)
+			last_hook = false;
+	}
+	return val;
 }
 
 void GAMECLIENT::on_connected()
@@ -299,6 +401,13 @@ void GAMECLIENT::on_connected()
 	
 	// send the inital info
 	send_info(true);
+
+	freeview = true;
+	spectate_cid = -1;
+	last_game_over = 0;
+	last_warmup = false;
+	last_flag_carrier[0] = -1;
+	last_flag_carrier[1] = -1;
 }
 
 void GAMECLIENT::on_reset()
@@ -318,7 +427,14 @@ void GAMECLIENT::on_reset()
 		clients[i].skin_info.texture = gameclient.skins->get(0)->color_texture;
 		clients[i].skin_info.color_body = vec4(1,1,1,1);
 		clients[i].skin_info.color_feet = vec4(1,1,1,1);
-		clients[i].update_render_info();
+		clients[i].update_render_info(i);
+
+		// anti rainbow
+		clients[i].color_change_count = 0;
+		clients[i].prev_color_body = vec4(1,1,1,1);
+		clients[i].prev_color_feet = vec4(1,1,1,1);
+
+		stats[i].reset();
 	}
 	
 	for(int i = 0; i < all.num; i++)
@@ -343,8 +459,46 @@ void GAMECLIENT::update_local_character_pos()
 			vec2(snap.local_prev_character->x, snap.local_prev_character->y),
 			vec2(snap.local_character->x, snap.local_character->y), client_intratick());
 	}
+	if(spectate_cid == -1)
+		freeview = true;
+	if(snap.spectate && !freeview)
+	{
+		if(!snap.characters[spectate_cid].active || clients[spectate_cid].team == -1)
+		{
+			find_next_spectable_cid();
+			return;
+		}
+		spectate_pos = mix(
+			vec2(snap.characters[spectate_cid].prev.x, snap.characters[spectate_cid].prev.y),
+			vec2(snap.characters[spectate_cid].cur.x, snap.characters[spectate_cid].cur.y), client_intratick());
+	}
 }
-
+ 
+void GAMECLIENT::find_next_spectable_cid()
+{
+	if(!freeview && (spectate_cid != killer_cid) && snap.characters[killer_cid].active && !(clients[killer_cid].team == -1))
+	{
+		spectate_cid = killer_cid;
+		return;
+	}
+	int next = spectate_cid+1;
+	next %= MAX_CLIENTS;
+	int prev = next;
+	while(!snap.characters[next].active || clients[next].team == -1)
+	{
+		next++;
+		next %= MAX_CLIENTS;
+		if(next == prev)
+		{
+			freeview = true;
+			spectate_cid = -1;
+			return;
+		}
+	}
+	spectate_cid = next;
+	if(freeview)
+		freeview = false;
+}
 
 static void evolve(NETOBJ_CHARACTER *character, int tick)
 {
@@ -473,6 +627,9 @@ void GAMECLIENT::on_statechange(int new_state, int old_state)
 	// then change the state
 	for(int i = 0; i < all.num; i++)
 		all.components[i]->on_statechange(new_state, old_state);
+
+	if(new_state == CLIENTSTATE_ONLINE && config.tc_autodemo)
+		teecomp_demo_start();
 }
 
 
@@ -570,6 +727,10 @@ void GAMECLIENT::on_snapshot()
 	{
 		snap.team_size[0] = snap.team_size[1] = 0;
 		
+		// TeeComp.
+		for(int i=0; i<MAX_CLIENTS; i++)
+			stats[i].active = false;
+
 		int num = snap_num_items(SNAP_CURRENT);
 		for(int i = 0; i < num; i++)
 		{
@@ -613,9 +774,8 @@ void GAMECLIENT::on_snapshot()
 					clients[cid].skin_info.color_feet = vec4(1,1,1,1);
 				}
 
-				clients[cid].update_render_info();
+				clients[cid].update_render_info(cid);
 				gameclient.snap.num_players++;
-				
 			}
 			else if(item.type == NETOBJTYPE_PLAYER_INFO)
 			{
@@ -635,7 +795,10 @@ void GAMECLIENT::on_snapshot()
 				
 				// calculate team-balance
 				if(info->team != -1)
+				{
 					snap.team_size[info->team]++;
+					stats[info->cid].active = true;
+				}
 				
 			}
 			else if(item.type == NETOBJTYPE_CHARACTER)
@@ -654,9 +817,46 @@ void GAMECLIENT::on_snapshot()
 				}
 			}
 			else if(item.type == NETOBJTYPE_GAME)
+			{
 				snap.gameobj = (NETOBJ_GAME *)data;
+				if(snap.gameobj->game_over != last_game_over)
+				{
+					if(!last_game_over)
+						on_game_over();
+					else
+						on_game_restart();
+					last_game_over = snap.gameobj->game_over;
+				}
+				if((snap.gameobj->warmup > 0) != last_warmup)
+				{
+					if(last_warmup)
+						on_warmup_end();
+					last_warmup = snap.gameobj->warmup > 0;
+				}
+			}
 			else if(item.type == NETOBJTYPE_FLAG)
-				snap.flags[item.id%2] = (const NETOBJ_FLAG *)data;
+			{
+				int fid = item.id%2;
+				snap.flags[fid] = (const NETOBJ_FLAG *)data;
+				if(snap.flags[fid]->carried_by != last_flag_carrier[fid])
+				{
+					if(snap.flags[fid]->carried_by >= 0)
+						on_flag_grab(fid);
+					last_flag_carrier[fid] = snap.flags[fid]->carried_by;
+				}
+			}
+		}
+
+		// TeeComp
+		for(int i=0; i<MAX_CLIENTS; i++)
+		{
+			if(stats[i].active && !stats[i].was_active)
+			{
+				stats[i].reset(); // Client connected, reset stats.
+				stats[i].active = true;
+				stats[i].join_date = client_tick();
+			}
+			stats[i].was_active = stats[i].active;
 		}
 	}
 	
@@ -690,7 +890,7 @@ void GAMECLIENT::on_snapshot()
 
 	// update render info
 	for(int i = 0; i < MAX_CLIENTS; i++)
-		clients[i].update_render_info();
+		clients[i].update_render_info(i);
 }
 
 void GAMECLIENT::on_predict()
@@ -817,21 +1017,104 @@ void GAMECLIENT::on_predict()
 	predicted_tick = client_predtick();
 }
 
-void GAMECLIENT::CLIENT_DATA::update_render_info()
+void GAMECLIENT::on_game_over()
+{
+	if(config.tc_autoscreen && !demorec_isplaying())
+		gfx_screenshot();
+}
+
+void GAMECLIENT::on_game_restart()
+{
+	if(!demorec_isplaying() && config.tc_autodemo && demorec_isrecording())
+	{
+		demorec_record_stop();
+		teecomp_demo_start();
+	}
+	for(int i=0; i<MAX_CLIENTS; i++)
+		stats[i].reset();
+}
+
+void GAMECLIENT::on_warmup_end()
+{
+	for(int i=0; i<MAX_CLIENTS; i++)
+		stats[i].reset();
+}
+
+void GAMECLIENT::on_flag_grab(int id)
+{
+	stats[snap.flags[id]->carried_by].flag_grabs++;
+}
+
+void GAMECLIENT::CLIENT_STATS::reset()
+{
+	join_date  = 0;
+	active     = false;
+	was_active = false;
+	frags      = 0;
+	deaths     = 0;
+	suicides   = 0;
+	for(int j=0; j<NUM_WEAPONS; j++)
+	{
+		frags_with[j]  = 0;
+		deaths_from[j] = 0;
+	}
+	flag_grabs      = 0;
+	flag_captures   = 0;
+	carriers_killed = 0;
+	kills_carrying  = 0;
+	deaths_carrying = 0;
+}
+
+void GAMECLIENT::CLIENT_DATA::update_render_info(int cid)
 {
 	render_info = skin_info;
 
 	// force team colors
 	if(gameclient.snap.gameobj && gameclient.snap.gameobj->flags&GAMEFLAG_TEAMS)
 	{
-		const int team_colors[2] = {65387, 10223467};
-		if(team >= 0 || team <= 1)
+		int local_team;
+		if(gameclient.snap.local_info)
+			local_team = gameclient.snap.local_info->team;
+		else // local_info null when joining a server
+			local_team = 0;
+
+		if(team != -1)
 		{
-			render_info.texture = gameclient.skins->get(skin_id)->color_texture;
-			render_info.color_body = gameclient.skins->get_color(team_colors[team]);
-			render_info.color_feet = gameclient.skins->get_color(team_colors[team]);
+			const char* forced_skin;
+			int sid = skin_id;
+			if(cid != gameclient.snap.local_cid && TeecompUtils::get_forced_skin_name(team, local_team, forced_skin))
+				sid = max(0, gameclient.skins->find(forced_skin));
+
+			if(TeecompUtils::get_force_dm_colors(team, local_team))
+			{
+				render_info.texture = gameclient.skins->get(sid)->org_texture;
+				render_info.color_body = vec4(1,1,1,1);
+				render_info.color_feet = vec4(1,1,1,1);
+			}
+			else
+			{
+				render_info.texture = gameclient.skins->get(sid)->color_texture;
+				vec3 col = TeecompUtils::getTeamColor(team, local_team, config.tc_colored_tees_team1,
+					config.tc_colored_tees_team2, config.tc_colored_tees_method);
+				render_info.color_body = vec4(col.r, col.g, col.b, 1.0f);
+				render_info.color_feet = vec4(col.r, col.g, col.b, 1.0f);
+			}
 		}
-	}		
+		else
+		{
+			render_info.color_body = vec4(1,1,1,1);
+			render_info.color_feet = vec4(1,1,1,1);
+		}
+	}
+	else if(config.tc_force_skin_team1 && cid != gameclient.snap.local_cid) // Force DM skin
+	{
+		const SKINS::SKIN* skin;
+		skin = gameclient.skins->get(max(0, gameclient.skins->find(config.tc_forced_skin1)));
+		if(use_custom_color)
+			render_info.texture = skin->color_texture;
+		else
+			render_info.texture = skin->org_texture;
+	}	
 }
 
 void GAMECLIENT::send_switch_team(int team)

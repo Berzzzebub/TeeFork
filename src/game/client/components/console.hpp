@@ -18,6 +18,7 @@ class CONSOLE : public COMPONENT
 		
 		int type;
 		int completion_enumeration_count;
+		int backlog_act_page;
 		
 	public:
 		char completion_buffer[128];

@@ -296,6 +296,21 @@ void gfx_text(void *font, float x, float y, float size, const char *text, int ma
 float gfx_text_width(void *font, float size, const char *text, int length);
 
 /*
+	Function:
+		gfx_text_line_count
+
+	Arguments:
+		font - Font to use for rendering (not used right now).
+		size - Font size.
+		text - Text to render.
+		line_width - Maximum width per line.
+
+	Returns:
+		Returns the number of lines needed to render the text.
+*/
+int gfx_text_line_count(void *font, float size, const char *text, int line_width);
+	
+/*
 	Function: gfx_text_color
 		TODO
 	

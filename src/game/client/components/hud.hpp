@@ -12,6 +12,8 @@ class HUD : public COMPONENT
 	void render_voting();
 	void render_healthandammo();
 	void render_goals();
+	void render_speed();
+	void render_spectate();
 	
 public:
 	HUD();

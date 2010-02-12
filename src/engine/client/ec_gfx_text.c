@@ -169,6 +169,7 @@ void gfx_text_ex(TEXT_CURSOR *cursor, const char *text, int length)
 					draw_x = (int)(draw_x * fake_to_screen_x) / fake_to_screen_x; /* realign */
 					draw_y = (int)(draw_y * fake_to_screen_y) / fake_to_screen_y;
 					current++;
+					++cursor->line_count;
 					continue;
 				}
 
@@ -200,7 +201,8 @@ void gfx_text_ex(TEXT_CURSOR *cursor, const char *text, int length)
 				draw_y += size;
 				got_new_line = 1;
 				draw_x = (int)(draw_x * fake_to_screen_x) / fake_to_screen_x; /* realign */
-				draw_y = (int)(draw_y * fake_to_screen_y) / fake_to_screen_y;				
+				draw_y = (int)(draw_y * fake_to_screen_y) / fake_to_screen_y;
+				++cursor->line_count;				
 			}
 		}
 
@@ -230,6 +232,15 @@ float gfx_text_width(void *font_set_v, float size, const char *text, int length)
 	return cursor.x;
 }
 
+int gfx_text_line_count(void *font_set_v, float size, const char *text, int line_width)
+{
+	TEXT_CURSOR cursor;
+	gfx_text_set_cursor(&cursor, 0, 0, size, 0);
+	cursor.line_width = line_width;
+	gfx_text_ex(&cursor, text, -1);
+	return cursor.line_count;
+}
+	
 void gfx_text_color(float r, float g, float b, float a)
 {
 	text_r = r;

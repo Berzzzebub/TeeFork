@@ -22,6 +22,8 @@ public:
 	int num();
 	const SKIN *get(int index);
 	int find(const char *name);
+	static vec3 hsl_to_rgb(vec3 in);
+	static float hue_to_rgb(float v1, float v2, float h);
 	
 private:
 	enum

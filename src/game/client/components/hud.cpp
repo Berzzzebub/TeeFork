@@ -1,6 +1,7 @@
 #include <memory.h> // memcmp
 
 #include <engine/e_client_interface.h>
+#include <engine/e_demorec.h>
 #include <game/generated/g_protocol.hpp>
 #include <game/generated/gc_data.hpp>
 
@@ -15,6 +16,8 @@
 #include "hud.hpp"
 #include "voting.hpp"
 #include "binds.hpp"
+
+#include <game/client/teecomp.hpp>
 
 HUD::HUD()
 {
@@ -54,12 +57,15 @@ void HUD::render_goals()
 		else
 			time = (client_tick()-gameclient.snap.gameobj->round_start_tick)/client_tickspeed();
 
-		str_format(buf, sizeof(buf), "%d:%02d", time /60, time %60);
-		float w = gfx_text_width(0, 16, buf, -1);
-		gfx_text(0, half-w/2, 2, 16, buf, -1);
+		if(config.cl_render_time && !config.cl_clear_hud && !config.cl_clear_all)
+		{
+			str_format(buf, sizeof(buf), "%d:%02d", time /60, time %60);
+			float w = gfx_text_width(0, 16, buf, -1);
+			gfx_text(0, half-w/2, 2, 16, buf, -1);
+		}
 	}
 
-	if(gameclient.snap.gameobj->sudden_death)
+	if((config.cl_render_time && !config.cl_clear_hud && !config.cl_clear_all) && gameclient.snap.gameobj->sudden_death)
 	{
 		const char *text = "Sudden Death";
 		float w = gfx_text_width(0, 16, text, -1);
@@ -67,17 +73,27 @@ void HUD::render_goals()
 	}
 
 	// render small score hud
-	if(!(gameclient.snap.gameobj && gameclient.snap.gameobj->game_over) && (gameflags&GAMEFLAG_TEAMS))
+	if((config.cl_render_score && !config.cl_clear_hud && !config.cl_clear_all) && !(gameclient.snap.gameobj && gameclient.snap.gameobj->game_over) && (gameflags&GAMEFLAG_TEAMS))
 	{
 		for(int t = 0; t < 2; t++)
 		{
 			gfx_blend_normal();
 			gfx_texture_set(-1);
 			gfx_quads_begin();
-			if(t == 0)
-				gfx_setcolor(1,0,0,0.25f);
+			if(!config.tc_hud_match)
+			{
+				if(t == 0)
+					gfx_setcolor(1,0,0,0.25f);
+				else
+					gfx_setcolor(0,0,1,0.25f);
+			}
 			else
-				gfx_setcolor(0,0,1,0.25f);
+			{
+				vec3 col = TeecompUtils::getTeamColor(t, gameclient.snap.local_info->team,
+					config.tc_colored_tees_team1, config.tc_colored_tees_team2, config.tc_colored_tees_method);
+				gfx_setcolor(col.r, col.g, col.b, 0.25f);
+			}
+
 			draw_round_rect(whole-40, 300-40-15+t*20, 50, 18, 5.0f);
 			gfx_quads_end();
 
@@ -93,12 +109,25 @@ void HUD::render_goals()
 					if(gameclient.snap.flags[t]->carried_by == -2 || (gameclient.snap.flags[t]->carried_by == -1 && ((client_tick()/10)&1)))
 					{
 						gfx_blend_normal();
-						gfx_texture_set(data->images[IMAGE_GAME].id);
+						if(config.tc_colored_flags)
+							gfx_texture_set(data->images[IMAGE_GAME_GRAY].id);
+						else
+							gfx_texture_set(data->images[IMAGE_GAME].id);
 						gfx_quads_begin();
 
 						if(t == 0) select_sprite(SPRITE_FLAG_RED);
 						else select_sprite(SPRITE_FLAG_BLUE);
 						
+						if(config.tc_colored_flags)
+						{
+							vec3 col = TeecompUtils::getTeamColor(t,
+								gameclient.snap.local_info->team,
+								config.tc_colored_tees_team1,
+								config.tc_colored_tees_team2,
+								config.tc_colored_tees_method);
+							gfx_setcolor(col.r, col.g, col.b, 1.0f);
+						}
+
 						float size = 16;					
 						gfx_quads_drawTL(whole-40+5, 300-40-15+t*20+1, size/2, size);
 						gfx_quads_end();
@@ -123,7 +152,7 @@ void HUD::render_goals()
 	}
 
 	// render warmup timer
-	if(gameclient.snap.gameobj->warmup)
+	if((config.cl_render_warmup && !config.cl_clear_all) && gameclient.snap.gameobj->warmup)
 	{
 		char buf[256];
 		float w = gfx_text_width(0, 24, "Warmup", -1);
@@ -149,7 +178,7 @@ static void mapscreen_to_group(float center_x, float center_y, MAPITEM_GROUP *gr
 
 void HUD::render_fps()
 {
-	if(config.cl_showfps)
+	if(config.cl_showfps && !config.cl_clear_all && !config.cl_clear_hud)
 	{
 		char buf[512];
 		str_format(buf, sizeof(buf), "%d", (int)(1.0f/client_frametime()));
@@ -173,7 +202,7 @@ void HUD::render_teambalancewarning()
 	bool flash = time_get()/(time_freq()/2)%2 == 0;
 	if (gameclient.snap.gameobj && (gameclient.snap.gameobj->flags&GAMEFLAG_TEAMS) != 0)
 	{	
-		if (config.cl_warning_teambalance && abs(gameclient.snap.team_size[0]-gameclient.snap.team_size[1]) >= 2)
+		if (config.cl_warning_teambalance && !config.cl_clear_all && abs(gameclient.snap.team_size[0]-gameclient.snap.team_size[1]) >= 2)
 		{
 			const char *text = "Please balance teams!";
 			if(flash)
@@ -252,10 +281,13 @@ void HUD::render_healthandammo()
 	
 	gfx_quads_begin();
 	
-	// if weaponstage is active, put a "glow" around the stage ammo
-	select_sprite(data->weapons.id[gameclient.snap.local_character->weapon%NUM_WEAPONS].sprite_proj);
-	for (int i = 0; i < min(gameclient.snap.local_character->ammocount, 10); i++)
-		gfx_quads_drawTL(x+i*12,y+24,10,10);
+	if(config.cl_render_ammo)
+	{
+		// if weaponstage is active, put a "glow" around the stage ammo
+		select_sprite(data->weapons.id[gameclient.snap.local_character->weapon%NUM_WEAPONS].sprite_proj);
+		for (int i = 0; i < min(gameclient.snap.local_character->ammocount, 10); i++)
+			gfx_quads_drawTL(x+i*12,y+24,10,10);
+	}
 
 	gfx_quads_end();
 
@@ -263,24 +295,87 @@ void HUD::render_healthandammo()
 	int h = 0;
 
 	// render health
-	select_sprite(SPRITE_HEALTH_FULL);
-	for(; h < gameclient.snap.local_character->health; h++)
-		gfx_quads_drawTL(x+h*12,y,10,10);
+	if(config.cl_render_hp)
+	{
+		select_sprite(SPRITE_HEALTH_FULL);
+		for(; h < gameclient.snap.local_character->health; h++)
+			gfx_quads_drawTL(x+h*12,y,10,10);
+ 
+		select_sprite(SPRITE_HEALTH_EMPTY);
+		for(; h < 10; h++)
+			gfx_quads_drawTL(x+h*12,y,10,10);
+	
+		// render armor meter
+		h = 0;
+		select_sprite(SPRITE_ARMOR_FULL);
+		for(; h < gameclient.snap.local_character->armor; h++)
+			gfx_quads_drawTL(x+h*12,y+12,10,10);
+ 
+		select_sprite(SPRITE_ARMOR_EMPTY);
+		for(; h < 10; h++)
+			gfx_quads_drawTL(x+h*12,y+12,10,10);
+	}
+		gfx_quads_end();
+}
 
-	select_sprite(SPRITE_HEALTH_EMPTY);
-	for(; h < 10; h++)
-		gfx_quads_drawTL(x+h*12,y,10,10);
+void HUD::render_speed()
+{
+	if(!config.tc_speedmeter)
+		return;
 
-	// render armor meter
-	h = 0;
-	select_sprite(SPRITE_ARMOR_FULL);
-	for(; h < gameclient.snap.local_character->armor; h++)
-		gfx_quads_drawTL(x+h*12,y+12,10,10);
+	// We calculate the speed instead of getting it from character.velocity cause it's buggy when
+	// walking in front of a wall or when using the ninja sword
+	static float speed;
+	static vec2 oldpos;
+	static const int SMOOTH_TABLE_SIZE = 16;
+	static const int ACCEL_THRESHOLD = 25;
+	static float smooth_table[SMOOTH_TABLE_SIZE];
+	static int smooth_index = 0;
 
-	select_sprite(SPRITE_ARMOR_EMPTY);
-	for(; h < 10; h++)
-		gfx_quads_drawTL(x+h*12,y+12,10,10);
+	smooth_table[smooth_index] = distance(gameclient.local_character_pos, oldpos)/client_frametime();
+	if(demorec_isplaying()) {
+		float mult = client_demoplayer_getinfo()->speed;
+		smooth_table[smooth_index] /= mult;
+	}
+	smooth_index = (smooth_index + 1) % SMOOTH_TABLE_SIZE;
+	oldpos = gameclient.local_character_pos;
+	speed = 0;
+	for(int i=0; i<SMOOTH_TABLE_SIZE; i++)
+		speed += smooth_table[i];
+	speed /= SMOOTH_TABLE_SIZE;
+
+	int t = (gameclient.snap.gameobj->flags & GAMEFLAG_TEAMS)? -1 : 1;
+	int last_index = smooth_index - 1;
+	if(last_index < 0)
+		last_index = SMOOTH_TABLE_SIZE - 1;
+
+	gfx_blend_normal();
+	gfx_texture_set(-1);
+	gfx_quads_begin();
+	if(config.tc_speedmeter_accel && speed - smooth_table[last_index] > ACCEL_THRESHOLD)
+		gfx_setcolor(0.6f, 0.1f, 0.1f, 0.25f);
+	else if(config.tc_speedmeter_accel && speed - smooth_table[last_index] < -ACCEL_THRESHOLD)
+		gfx_setcolor(0.1f, 0.6f, 0.1f, 0.25f);
+	else
+		gfx_setcolor(0.1, 0.1, 0.1, 0.25);
+	draw_round_rect(width-40, 245+t*20, 50, 18, 5.0f);
 	gfx_quads_end();
+
+	char buf[16];
+	str_format(buf, sizeof(buf), "%.0f", speed);
+	gfx_text(0, width-5-gfx_text_width(0,12,buf,-1), 246+t*20, 12, buf, -1);
+}
+
+void HUD::render_spectate()
+{
+	if(gameclient.freeview)
+		gfx_text(0, 4*gfx_screenaspect(), 4, 8, "Freeview", -1);
+	else
+	{
+		char buf[96];
+		str_format(buf, sizeof(buf), "Following: %s", gameclient.clients[gameclient.spectate_cid].name);
+		gfx_text(0, 4*gfx_screenaspect(), 4, 8, buf, -1);
+	}
 }
 
 void HUD::on_render()
@@ -294,14 +389,21 @@ void HUD::on_render()
 	if(gameclient.snap.local_info && gameclient.snap.local_info->team == -1)
 		spectate = true;
 	
-	if(gameclient.snap.local_character && !spectate && !(gameclient.snap.gameobj && gameclient.snap.gameobj->game_over))
+	if(!config.cl_clear_hud && !config.cl_clear_all && gameclient.snap.local_character && !spectate && !(gameclient.snap.gameobj && gameclient.snap.gameobj->game_over))
+	{
 		render_healthandammo();
+		render_speed();
+	}
 
 	render_goals();
 	render_fps();
 	if(client_state() != CLIENTSTATE_DEMOPLAYBACK)
 		render_connectionwarning();
 	render_teambalancewarning();
-	render_voting();
-	render_cursor();
+	if(config.cl_render_vote && !config.cl_clear_all)	
+		render_voting();
+	if(config.cl_render_crosshair && !config.cl_clear_hud && !config.cl_clear_all)
+		render_cursor();
+	if(config.cl_render_viewmode && !config.cl_clear_hud && !config.cl_clear_all && spectate && !(gameclient.snap.gameobj && gameclient.snap.gameobj->game_over))
+		render_spectate();
 }

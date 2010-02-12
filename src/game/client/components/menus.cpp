@@ -97,6 +97,12 @@ MENUS::MENUS()
 	num_demos = 0;
 	
 	last_input = time_get();
+	
+	download.tick = 0;
+	download.elapsedtick = 50;
+	download.elapsedsec = 0;
+	download.speed = 0;
+	download.timeneeded = 0;
 }
 
 vec4 MENUS::button_color_mul(const void *id)
@@ -730,28 +736,74 @@ int MENUS::render()
 			render_serverbrowser(main_view);
 		else if(config.ui_page == PAGE_SETTINGS)
 			render_settings(main_view);
+				
+		// Reset download vars
+		download.elapsedtick = 50;
+		download.elapsedsec = 0;
+		download.speed = 0;
+		download.timeneeded = 0;
 	}
 	else
 	{
 		// make sure that other windows doesn't do anything funnay!
 		//ui_set_hot_item(0);
 		//ui_set_active_item(0);
-		char buf[128];
+		char buf2[128];
 		const char *title = "";
 		const char *extra_text = "";
 		const char *button_text = "";
+		const char *footer_text = "";
 		int extra_align = 0;
+		
+		bool footer_text_use = false;
 		
 		if(popup == POPUP_CONNECTING)
 		{
+			download.tick++;
 			title = "Connecting to";
-			extra_text = config.ui_server_address;  // TODO: query the client about the address
+			extra_text = download.extra_text;  // TODO: query the client about the address
 			button_text = "Abort";
 			if(client_mapdownload_totalsize() > 0)
 			{
-				title = "Downloading map";
-				str_format(buf, sizeof(buf), "%d/%d KiB", client_mapdownload_amount()/1024, client_mapdownload_totalsize()/1024);
-				extra_text = buf;
+				if(download.elapsedtick <= 0)
+				{
+					download.elapsedsec++;	
+					download.elapsedtick = 50;
+				}
+				else if(download.elapsedtick > 0)
+					download.elapsedtick--;
+
+				download.timeneeded = (float)download.elapsedsec+(50-download.elapsedtick)/50.0;
+				download.speed = (float)client_mapdownload_amount()/1024/download.timeneeded;
+				
+				str_format(buf2, sizeof(buf2),"Downloading map '%s'", client_mapdownload_name());
+				dbg_msg("test", "%d", client_tickspeed());
+				if(download.tick % 25 == 0)
+				{
+					str_format(download.extra_text, sizeof(download.extra_text), "Connecting to......: %s\nStatus...................: %d%%\nSize.......................: %d/%d KiB\nDownloadspeed..: %3.2f KiB/s\nTime elapsed.......: %3.0f sec\nTime needed........: %3.0f sec", config.ui_server_address, (client_mapdownload_amount()/1024*100)/(client_mapdownload_totalsize()/1024), client_mapdownload_amount()/1024, client_mapdownload_totalsize()/1024,download.speed, download.timeneeded, ((float)client_mapdownload_totalsize()/1024-client_mapdownload_amount()/1024)/download.speed);
+				}
+				
+				title = buf2;
+
+				// START - Render Status Bar
+				RECT screen = *ui_screen();
+				gfx_mapscreen(screen.x, screen.y, screen.w, screen.h);
+
+				float w = 700;
+				float h = 200;
+				float x = screen.w/2-w/2;
+				float y = screen.h/2-h/2;
+
+				gfx_texture_set(-1);
+				gfx_quads_begin();
+				gfx_setcolor(config.cl_downloadextension_statusbar_r/255.0f, config.cl_downloadextension_statusbar_g/255.0f, config.cl_downloadextension_statusbar_b/255.0f, config.cl_downloadextension_statusbar_a/255.0f);
+				draw_round_rect(x+40, y+h-75+20, (w-80)*(client_mapdownload_amount()/1024*100)/(client_mapdownload_totalsize()/1024)/100, 25, 5.0f);
+				gfx_quads_end();
+				// END - Render Staus Bar
+
+				// Mod By KillaBilla
+				footer_text = "DownloadExtension Mod\nVersion: 1.1\nMod by KillaBilla";
+				footer_text_use = true;
 			}
 		}
 		else if(popup == POPUP_DISCONNECTED)
@@ -898,6 +950,14 @@ int MENUS::render()
 					client_disconnect();
 				popup = POPUP_NONE;
 			}
+		}
+
+		// Render Footer Text
+		if(footer_text_use)
+		{
+			ui_hsplit_t(&box, 300.f, &part, &box);
+			ui_vsplit_l(&box, -195.f, &part, &box);
+			ui_do_label(&part, footer_text, 15.f, 0, -1);
 		}
 	}
 	

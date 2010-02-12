@@ -224,7 +224,7 @@ void console_execute_line_stroked(int stroke, const char *str)
 	if(stroke)
 		strokestr[0] = '1';
 
-	while(str)
+	while(str && *str)
 	{
 		const char *end = str;
 		const char *next_part = 0;

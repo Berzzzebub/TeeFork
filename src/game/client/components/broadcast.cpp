@@ -14,12 +14,15 @@ void BROADCAST::on_reset()
 
 void BROADCAST::on_render()
 {
-	gfx_mapscreen(0, 0, 300*gfx_screenaspect(), 300);
-		
-	if(time_get() < broadcast_time)
+	if(config.cl_render_broadcast && !config.cl_clear_all)
 	{
-		float w = gfx_text_width(0, 14, broadcast_text, -1);
-		gfx_text(0, 150*gfx_screenaspect()-w/2, 35, 14, broadcast_text, -1);
+		gfx_mapscreen(0, 0, 300*gfx_screenaspect(), 300);
+		
+		if(time_get() < broadcast_time)
+		{
+			float w = gfx_text_width(0, 14, broadcast_text, -1);
+			gfx_text(0, 150*gfx_screenaspect()-w/2, 35, 14, broadcast_text, -1);
+		}
 	}
 }
 

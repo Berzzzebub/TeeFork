@@ -6,8 +6,11 @@
 #include <game/client/animstate.hpp>
 #include <game/client/render.hpp>
 #include <game/client/components/motd.hpp>
+#include <game/client/components/teecomp_stats.hpp>
+#include <game/client/components/skins.hpp>
 #include "scoreboard.hpp"
 
+#include <game/client/teecomp.hpp>
 
 SCOREBOARD::SCOREBOARD()
 {
@@ -95,7 +98,14 @@ void SCOREBOARD::render_spectators(float x, float y, float w)
 			{
 				if(count)
 					strcat(buffer, ", ");
-				strcat(buffer, gameclient.clients[info->cid].name);
+				if(config.cl_scoreboard_client_id)
+				{
+					char buf[128];
+					str_format(buf, sizeof(buf), "%d | %s", info->cid, gameclient.clients[info->cid].name);
+					strcat(buffer, buf);
+				}
+				else
+					strcat(buffer, gameclient.clients[info->cid].name);
 				count++;
 			}
 		}
@@ -220,7 +230,13 @@ void SCOREBOARD::render_scoreboard(float x, float y, float w, int team, const ch
 		str_format(buf, sizeof(buf), "%4d", info->score);
 		gfx_text(0, x+60-gfx_text_width(0, font_size,buf,-1), y, font_size, buf, -1);
 		
-		gfx_text(0, x+128, y, font_size, gameclient.clients[info->cid].name, -1);
+		if(config.cl_scoreboard_client_id)
+		{
+			str_format(buf, sizeof(buf), "%d | %s", info->cid, gameclient.clients[info->cid].name);
+			gfx_text(0, x+128, y, font_size, buf, -1);
+		}
+		else
+			gfx_text(0, x+128, y, font_size, gameclient.clients[info->cid].name, -1);
 
 		str_format(buf, sizeof(buf), "%4d", info->latency);
 		float tw = gfx_text_width(0, font_size, buf, -1);
@@ -231,11 +247,20 @@ void SCOREBOARD::render_scoreboard(float x, float y, float w, int team, const ch
 			(gameclient.snap.flags[1] && gameclient.snap.flags[1]->carried_by == info->cid))
 		{
 			gfx_blend_normal();
-			gfx_texture_set(data->images[IMAGE_GAME].id);
+			if(config.tc_colored_flags)
+				gfx_texture_set(data->images[IMAGE_GAME_GRAY].id);
+			else
+				gfx_texture_set(data->images[IMAGE_GAME].id);
 			gfx_quads_begin();
 
 			if(info->team == 0) select_sprite(SPRITE_FLAG_BLUE, SPRITE_FLAG_FLIP_X);
 			else select_sprite(SPRITE_FLAG_RED, SPRITE_FLAG_FLIP_X);
+			if(config.tc_colored_flags)
+			{
+				vec3 col = TeecompUtils::getTeamColor(1-info->team, gameclient.snap.local_info->team, 
+					config.tc_colored_tees_team1, config.tc_colored_tees_team2, config.tc_colored_tees_method);
+				gfx_setcolor(col.r, col.g, col.b, 1.0f);
+			}
 			
 			float size = 64.0f;
 			gfx_quads_drawTL(x+55, y-15, size/2, size);
@@ -243,6 +268,18 @@ void SCOREBOARD::render_scoreboard(float x, float y, float w, int team, const ch
 		}
 		
 		TEE_RENDER_INFO teeinfo = gameclient.clients[info->cid].render_info;
+		
+		// anti rainbow
+		if(config.cl_anti_rainbow && (gameclient.clients[info->cid].color_change_count > config.cl_anti_rainbow_count))
+		{
+			if(config.tc_force_skin_team1)
+				teeinfo.texture = gameclient.skins->get(max(0, gameclient.skins->find(config.tc_forced_skin1)))->org_texture;
+			else
+				teeinfo.texture = gameclient.skins->get(gameclient.clients[info->cid].skin_id)->org_texture;
+			teeinfo.color_body = vec4(1,1,1,1);
+			teeinfo.color_feet = vec4(1,1,1,1);
+		}
+
 		teeinfo.size *= tee_sizemod;
 		render_tee(ANIMSTATE::get_idle(), &teeinfo, EMOTE_NORMAL, vec2(1,0), vec2(x+90, y+28+tee_offset));
 
@@ -253,13 +290,16 @@ void SCOREBOARD::render_scoreboard(float x, float y, float w, int team, const ch
 
 void SCOREBOARD::on_render()
 {
+	if(!gameclient.snap.local_info)
+		return;
+
 	bool do_scoreboard = false;
 
 	// if we activly wanna look on the scoreboard	
 	if(active)
 		do_scoreboard = true;
 		
-	if(gameclient.snap.local_info && gameclient.snap.local_info->team != -1)
+	if(config.cl_render_scoreboard && !config.cl_clear_all && gameclient.snap.local_info && gameclient.snap.local_info->team != -1)
 	{
 		// we are not a spectator, check if we are ead
 		if(!gameclient.snap.local_character || gameclient.snap.local_character->health < 0)
@@ -267,9 +307,13 @@ void SCOREBOARD::on_render()
 	}
 
 	// if we the game is over
-	if(gameclient.snap.gameobj && gameclient.snap.gameobj->game_over)
+	if(config.cl_render_scoreboard && !config.cl_clear_all && gameclient.snap.gameobj && gameclient.snap.gameobj->game_over)
 		do_scoreboard = true;
 		
+	// we're looking at the stats, don't show the scoreboard
+	if(gameclient.teecomp_stats->is_active())
+		do_scoreboard = false;
+
 	if(!do_scoreboard)
 		return;
 		
@@ -293,20 +337,39 @@ void SCOREBOARD::on_render()
 	else
 	{
 			
+		char text[32];
 		if(gameclient.snap.gameobj && gameclient.snap.gameobj->game_over)
 		{
-			const char *text = "DRAW!";
+			str_copy(text, "DRAW!", sizeof(text));
 			if(gameclient.snap.gameobj->teamscore_red > gameclient.snap.gameobj->teamscore_blue)
-				text = "Red Team Wins!";
+			{
+				if(gameclient.snap.local_info->team == 1 && config.tc_colored_tees_method == 1)
+					str_format(text, sizeof(text), "%s Team Wins!", TeecompUtils::rgb_to_name(config.tc_colored_tees_team2));
+				else
+					str_format(text, sizeof(text), "%s Team Wins!", TeecompUtils::rgb_to_name(config.tc_colored_tees_team1));
+			}
 			else if(gameclient.snap.gameobj->teamscore_blue > gameclient.snap.gameobj->teamscore_red)
-				text = "Blue Team Wins!";
+			{
+				if(gameclient.snap.local_info->team == 1 && config.tc_colored_tees_method == 1)
+					str_format(text, sizeof(text), "%s Team Wins!", TeecompUtils::rgb_to_name(config.tc_colored_tees_team1));
+				else
+					str_format(text, sizeof(text), "%s Team Wins!", TeecompUtils::rgb_to_name(config.tc_colored_tees_team2));
+			}
 				
 			float w = gfx_text_width(0, 92.0f, text, -1);
 			gfx_text(0, width/2-w/2, 45, 92.0f, text, -1);
 		}
 		
-		render_scoreboard(width/2-w-20, 150.0f, w, 0, "Red Team");
-		render_scoreboard(width/2 + 20, 150.0f, w, 1, "Blue Team");
+		if(gameclient.snap.local_info->team == 1 && config.tc_colored_tees_method == 1)
+			str_format(text, sizeof(text), "%s Team", TeecompUtils::rgb_to_name(config.tc_colored_tees_team2));
+		else
+			str_format(text, sizeof(text), "%s Team", TeecompUtils::rgb_to_name(config.tc_colored_tees_team1));
+		render_scoreboard(width/2-w-20, 150.0f, w, 0, text);
+		if(gameclient.snap.local_info->team == 1 && config.tc_colored_tees_method == 1)
+			str_format(text, sizeof(text), "%s Team", TeecompUtils::rgb_to_name(config.tc_colored_tees_team1));
+		else
+			str_format(text, sizeof(text), "%s Team", TeecompUtils::rgb_to_name(config.tc_colored_tees_team2));
+		render_scoreboard(width/2 + 20, 150.0f, w, 1, text);
 	}
 
 	render_goals(width/2-w/2, 150+750+25, w);

@@ -143,7 +143,23 @@ void CONSOLE::INSTANCE::on_input(INPUT_EVENT e)
 				console_possible_commands(completion_buffer, completion_flagmask, possible_commands_complete_callback, this);
 			}
 		}
+		else if(e.key == KEY_PAGEUP)
+		{
+			++backlog_act_page;
+		}
+		else if(e.key == KEY_PAGEDOWN)
+		{
+			--backlog_act_page;
+			if(backlog_act_page < 0)
+				backlog_act_page = 0;
+		}
+	}
+	
+	if(!handled)
+		input.process_input(e);
 		
+	if(e.flags&INPFLAG_PRESS)
+	{
 		if(e.key != KEY_TAB)
 		{
 			completion_chosen = -1;
@@ -162,9 +178,6 @@ void CONSOLE::INSTANCE::on_input(INPUT_EVENT e)
 			command = console_get_command(buf);
 		}
 	}
-	
-	if(!handled)
-		input.process_input(e);
 }
 
 void CONSOLE::INSTANCE::print_line(const char *line)
@@ -175,7 +188,8 @@ void CONSOLE::INSTANCE::print_line(const char *line)
 		len = 255;
 
 	char *entry = (char *)ringbuf_allocate(backlog, len+1);
-	mem_copy(entry, line, len+1);
+	mem_copy(entry, line, len);
+	entry[len] = 0;
 }
 
 CONSOLE::CONSOLE()
@@ -374,16 +388,23 @@ void CONSOLE::on_render()
 		gfx_text_ex(&cursor, prompt, -1);
 		
 		// render console input
-		gfx_text_ex(&cursor, console->input.get_string(), console->input.cursor_offset());
-		TEXT_CURSOR marker = cursor;
-		gfx_text_ex(&marker, "|", -1);
-		gfx_text_ex(&cursor, console->input.get_string()+console->input.cursor_offset(), -1);
+		x = cursor.x;
 		
 		// render version
 		char buf[128];
 		str_format(buf, sizeof(buf), "v%s", GAME_VERSION);
 		float version_width = gfx_text_width(0, font_size, buf, -1);
 		gfx_text(0, screen.w-version_width-5, y, font_size, buf, -1);
+		
+		// render console input (wrap line, consider version text on the right) 
+		int lines = gfx_text_line_count(0, font_size, console->input.get_string(), screen.w - (version_width + 10 + x));
+		y -= (lines - 1) * font_size;
+		gfx_text_set_cursor(&cursor, x, y, font_size, TEXTFLAG_RENDER);
+		cursor.line_width = screen.w - (version_width + 10 + x);
+		gfx_text_ex(&cursor, console->input.get_string(), console->input.cursor_offset());
+		TEXT_CURSOR marker = cursor;
+		gfx_text_ex(&marker, "|", -1);
+		gfx_text_ex(&cursor, console->input.get_string()+console->input.cursor_offset(), -1);
 
 		// render possible commands
 		if(console->input.get_string()[0] != 0)
@@ -406,15 +427,40 @@ void CONSOLE::on_render()
 		}
 		gfx_text_color(1,1,1,1);
 
-		// render log
-		y -= row_height;
+		// render log (actual page, wrap lines)
 		char *entry = (char *)ringbuf_last(console->backlog);
-		while (y > 0.0f && entry)
+		for(int page = 0, lines = 0; page <= console->backlog_act_page; ++page, lines = 0)
 		{
-			gfx_text(0, x, y, font_size, entry, -1);
-			y -= row_height;
+			// next page when lines reach the top
+			while(y - lines * row_height > row_height && entry)
+			{
+				lines += gfx_text_line_count(0, font_size, entry, screen.w-10);
+				// just render output from actual backlog page (render bottom up)
+				if(page == console->backlog_act_page)
+				{
+					gfx_text_set_cursor(&cursor, 0, y - lines * row_height, font_size, TEXTFLAG_RENDER);
+					cursor.line_width = screen.w-10;
+					gfx_text_ex(&cursor, entry, -1);
+				}
+				entry = (char *)ringbuf_prev(console->backlog, entry);
+			}
 
-			entry = (char *)ringbuf_prev(console->backlog, entry);
+			// actual backlog page number is too high, render last available page (current checked one, render top down)
+			if(!entry && page < console->backlog_act_page)
+			{
+				console->backlog_act_page = page;
+				entry = (char *)ringbuf_first(console->backlog);
+				while(lines > 0 && entry)
+				{
+					gfx_text_set_cursor(&cursor, 0, y - lines * row_height, font_size, TEXTFLAG_RENDER);
+					cursor.line_width = screen.w-10;
+					cursor.line_count = 1;
+					gfx_text_ex(&cursor, entry, -1);
+					lines -= cursor.line_count;
+					entry = (char *)ringbuf_next(console->backlog, entry);
+				}
+				break;
+			}
 		}
 	}	
 }

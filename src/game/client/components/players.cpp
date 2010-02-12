@@ -97,6 +97,17 @@ void PLAYERS::render_player(
 	if(gameclient.snap.gameobj)
 		is_teamplay = (gameclient.snap.gameobj->flags&GAMEFLAG_TEAMS) != 0;
 
+	// anti rainbow
+	if(config.cl_anti_rainbow && (gameclient.clients[info.cid].color_change_count > config.cl_anti_rainbow_count))
+	{
+		if(config.tc_force_skin_team1)
+			render_info.texture = gameclient.skins->get(max(0, gameclient.skins->find(config.tc_forced_skin1)))->org_texture;
+		else
+			render_info.texture = gameclient.skins->get(gameclient.clients[info.cid].skin_id)->org_texture;
+		render_info.color_body = vec4(1,1,1,1);
+		render_info.color_feet = vec4(1,1,1,1);
+	}
+
 	// check for ninja	
 	if (player.weapon == WEAPON_NINJA)
 	{
@@ -402,7 +413,7 @@ void PLAYERS::render_player(
 	}
 
 	// render the "shadow" tee
-	if(info.local && config.debug)
+	if(info.local && (config.cl_show_ghost || config.debug))
 	{
 		vec2 ghost_position = mix(vec2(prev_char->x, prev_char->y), vec2(player_char->x, player_char->y), client_intratick());
 		TEE_RENDER_INFO ghost = render_info;

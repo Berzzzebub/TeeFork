@@ -8,6 +8,7 @@
 #include <game/generated/gc_data.hpp>
 #include <game/generated/g_protocol.hpp>
 #include <game/layers.hpp>
+#include "gameclient.hpp"
 #include "animstate.hpp"
 #include "render.hpp"
 
@@ -155,7 +156,7 @@ void render_tee(ANIMSTATE *anim, TEE_RENDER_INFO *info, int emote, vec2 dir, vec
 {
 	vec2 direction = dir;
 	vec2 position = pos;
-
+	
 	//gfx_texture_set(data->images[IMAGE_CHAR_DEFAULT].id);
 	gfx_texture_set(info->texture);
 	gfx_quads_begin();
@@ -237,6 +238,44 @@ void render_tee(ANIMSTATE *anim, TEE_RENDER_INFO *info, int emote, vec2 dir, vec
 		}
 	}
 
+	bool is_teamplay = false;
+	if(gameclient.snap.gameobj)
+		is_teamplay = (gameclient.snap.gameobj->flags&GAMEFLAG_TEAMS) != 0;
+		
+	// anti rainbow
+	if(config.cl_anti_rainbow && !is_teamplay)
+	{
+		for(int i = 0; i < MAX_CLIENTS; i++)
+		{
+			// dont check for local player
+			if(i == gameclient.snap.local_cid)
+				continue;
+				
+			// reset if player is not active
+			if(!gameclient.stats[i].active)
+			{
+				gameclient.clients[i].color_change_count = 0;
+				gameclient.clients[i].prev_color_body = vec4(1,1,1,1);
+				gameclient.clients[i].prev_color_feet = vec4(1,1,1,1);
+				continue;
+			}
+			
+			// check for color change
+			if((gameclient.clients[i].render_info.color_body.r != gameclient.clients[i].prev_color_body.r) || (gameclient.clients[i].render_info.color_body.g != gameclient.clients[i].prev_color_body.g) || (gameclient.clients[i].render_info.color_body.b != gameclient.clients[i].prev_color_body.b)
+			|| (gameclient.clients[i].render_info.color_feet.r != gameclient.clients[i].prev_color_feet.r) || (gameclient.clients[i].render_info.color_feet.g != gameclient.clients[i].prev_color_feet.g) || (gameclient.clients[i].render_info.color_feet.b != gameclient.clients[i].prev_color_feet.b))
+			{
+				if(((float)gameclient.clients[i].prev_color_body.r != 1) || ((float)gameclient.clients[i].prev_color_body.g != 1) || ((float)gameclient.clients[i].prev_color_body.b != 1)
+				|| ((float)gameclient.clients[i].prev_color_feet.r != 1) || ((float)gameclient.clients[i].prev_color_feet.g != 1) || ((float)gameclient.clients[i].prev_color_feet.b != 1))
+				{
+					gameclient.clients[i].color_change_count++;
+					dbg_msg("color", "Player: %s | Change count: %d", gameclient.clients[i].name, gameclient.clients[i].color_change_count);
+				}
+				gameclient.clients[i].prev_color_body = gameclient.clients[i].render_info.color_body;
+				gameclient.clients[i].prev_color_feet = gameclient.clients[i].render_info.color_feet;
+			}
+		}
+	}
+	
 	gfx_quads_end();
 	
 	

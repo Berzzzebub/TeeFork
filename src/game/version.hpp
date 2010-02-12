@@ -2,3 +2,4 @@
 #include "generated/nethash.c"
 #define GAME_VERSION "0.5.2"
 #define GAME_NETVERSION "0.5 " GAME_NETVERSION_HASH
+#define TEECOMP_VERSION "0.7.0"

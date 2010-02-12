@@ -5,6 +5,7 @@
 #include <game/generated/gc_data.hpp>
 
 #include <game/client/gameclient.hpp>
+#include <game/client/teecomp.hpp>
 
 #include <game/client/components/sounds.hpp>
 
@@ -88,12 +89,81 @@ void CHAT::on_message(int msgtype, void *rawmsg)
 	if(msgtype == NETMSGTYPE_SV_CHAT)
 	{
 		NETMSG_SV_CHAT *msg = (NETMSG_SV_CHAT *)rawmsg;
-		add_line(msg->cid, msg->team, msg->message);
+		const char *message = msg->message;
+		
+		// save last message for each player
+		spam = false;
+		
+		if(!strcmp(last_msg[msg->cid], message) != 0)
+			spam = true;
+			
+		strcpy(last_msg[msg->cid], message);
+			
+		// check if player is ignored
+		char buf[64];
+		strcpy(buf, config.cl_spammer_name);
 
-		if(msg->cid >= 0)
-			gameclient.sounds->play(SOUNDS::CHN_GUI, SOUND_CHAT_CLIENT, 0, vec2(0,0));
-		else
-			gameclient.sounds->play(SOUNDS::CHN_GUI, SOUND_CHAT_SERVER, 0, vec2(0,0));
+		struct split sp = split(buf, ' '); 
+		
+		ignore_player = false;
+		
+		if(config.cl_block_spammer)
+		{
+			int i = 0;
+			while (i < sp.count)
+			{
+				if(str_find_nocase(gameclient.clients[msg->cid].name, sp.pointers[i]) != 0)
+				{
+					ignore_player = true;
+					break;
+				}
+				else
+					i++;
+			}
+		}
+		
+		// check if message should be marked
+		strcpy(buf, config.cl_search_name);
+
+		struct split sp2 = split(buf, ' '); 
+		
+		contains_name = false;
+		
+		if(config.cl_change_color || config.cl_change_sound)
+		{
+			int i = 0;
+			while (i < sp2.count)
+			{
+				if(str_find_nocase(message, sp2.pointers[i]) != 0)
+				{
+					contains_name = true;
+					break;
+				}
+				else
+					i++;
+			}
+		}
+			
+ 		add_line(msg->cid, msg->team, msg->message);
+
+		if(!spam && !ignore_player)
+		{
+			if((msg->cid >= 0) && config.cl_change_sound && contains_name)	
+			{
+				if(config.cl_chatsound)
+					gameclient.sounds->play(SOUNDS::CHN_GUI, SOUND_TEE_CRY, 0, vec2(0,0));
+			}
+			else if(msg->cid >= 0)
+			{
+				if(config.cl_chatsound)
+					gameclient.sounds->play(SOUNDS::CHN_GUI, SOUND_CHAT_CLIENT, 0, vec2(0,0));
+			}
+			else
+			{
+				if(config.cl_servermsgsound)
+					gameclient.sounds->play(SOUNDS::CHN_GUI, SOUND_CHAT_SERVER, 0, vec2(0,0));
+			}
+		}
 	}
 }
 
@@ -104,7 +174,15 @@ void CHAT::add_line(int client_id, int team, const char *line)
 	lines[current_line].client_id = client_id;
 	lines[current_line].team = team;
 	lines[current_line].name_color = -2;
-
+	lines[current_line].contains_name = 0;
+	lines[current_line].ignore = 0;
+	lines[current_line].spam = 0;
+	
+	if(config.cl_block_spammer && ignore_player)
+		lines[current_line].ignore = 1;
+	if(config.cl_anti_spam && spam)
+		lines[current_line].spam = 1;
+		
 	if(client_id == -1) // server message
 	{
 		str_copy(lines[current_line].name, "*** ", sizeof(lines[current_line].name));
@@ -112,15 +190,30 @@ void CHAT::add_line(int client_id, int team, const char *line)
 	}
 	else
 	{
-		if(gameclient.clients[client_id].team == -1)
+		if((gameclient.clients[client_id].team == -1) && contains_name)
+		{
+			lines[current_line].contains_name = 1;
+ 			lines[current_line].name_color = -1;
+		}
+		else if(gameclient.clients[client_id].team == -1)
 			lines[current_line].name_color = -1;
 
-		if(gameclient.snap.gameobj && gameclient.snap.gameobj->flags&GAMEFLAG_TEAMS)
-		{
-			if(gameclient.clients[client_id].team == 0)
+ 		if(gameclient.snap.gameobj && gameclient.snap.gameobj->flags&GAMEFLAG_TEAMS)
+ 		{
+			if((gameclient.clients[client_id].team == 0) && contains_name)
+			{
+				lines[current_line].contains_name = 1;
+ 				lines[current_line].name_color = 0;
+			}
+			else if(gameclient.clients[client_id].team == 0)
 				lines[current_line].name_color = 0;
-			else if(gameclient.clients[client_id].team == 1)
+			else if((gameclient.clients[client_id].team == 1) && contains_name)
+			{
+				lines[current_line].contains_name = 1;
 				lines[current_line].name_color = 1;
+			}
+ 			else if(gameclient.clients[client_id].team == 1)
+ 				lines[current_line].name_color = 1;
 		}
 		
 		str_copy(lines[current_line].name, gameclient.clients[client_id].name, sizeof(lines[current_line].name));
@@ -173,7 +266,15 @@ void CHAT::on_render()
 		cursor.line_width = 200.0f;
 		gfx_text_ex(&cursor, lines[r].name, -1);
 		gfx_text_ex(&cursor, lines[r].text, -1);
-		y -= cursor.y + cursor.font_size;
+		if(!lines[r].spam && !lines[r].ignore)
+		{
+			if(config.cl_render_chat && !config.cl_render_servermsg && !(lines[r].client_id == -1))
+				y -= cursor.y + cursor.font_size;
+			else if(!config.cl_render_chat && config.cl_render_servermsg && (lines[r].client_id == -1))
+				y -= cursor.y + cursor.font_size;
+			else if(config.cl_render_chat && config.cl_render_servermsg)
+				y -= cursor.y + cursor.font_size;
+		}
 
 		// cut off if msgs waste too much space
 		if(y < 200.0f)
@@ -184,29 +285,72 @@ void CHAT::on_render()
 		cursor.line_width = 200.0f;
 
 		// render name
-		gfx_text_color(0.8f,0.8f,0.8f,1);
-		if(lines[r].client_id == -1)
-			gfx_text_color(1,1,0.5f,1); // system
-		else if(lines[r].team)
-			gfx_text_color(0.45f,0.9f,0.45f,1); // team message
-		else if(lines[r].name_color == 0)
-			gfx_text_color(1.0f,0.5f,0.5f,1); // red
-		else if(lines[r].name_color == 1)
-			gfx_text_color(0.7f,0.7f,1.0f,1); // blue
-		else if(lines[r].name_color == -1)
-			gfx_text_color(0.75f,0.5f,0.75f, 1); // spectator
+		if(!config.cl_clear_all)
+		{
+			vec3 tcolor;
+			gfx_text_color(0.8f,0.8f,0.8f,1);
+			if(lines[r].client_id == -1)
+				gfx_text_color(1,1,0.5f,1); // system
+			else if(lines[r].team)
+				gfx_text_color(0.45f,0.9f,0.45f,1); // team message
+			else if(lines[r].name_color == 0)
+			{
+				if(!gameclient.snap.local_info)
+					gfx_text_color(1.0f,0.5f,0.5f,1); // red
+				else
+				{
+					tcolor = TeecompUtils::getTeamColor(0, gameclient.snap.local_info->team, config.tc_colored_tees_team1,
+							config.tc_colored_tees_team2, config.tc_colored_tees_method);
+					gfx_text_color(tcolor.r, tcolor.g, tcolor.b, 1);
+				}
+			}
+			else if(lines[r].name_color == 1)
+			{
+				if(!gameclient.snap.local_info)
+					gfx_text_color(0.7f,0.7f,1.0f,1); // blue
+				else
+				{
+					tcolor = TeecompUtils::getTeamColor(1, gameclient.snap.local_info->team, config.tc_colored_tees_team1,
+							config.tc_colored_tees_team2, config.tc_colored_tees_method);
+					gfx_text_color(tcolor.r, tcolor.g, tcolor.b, 1);
+				}	
+			}
+			else if(lines[r].name_color == -1)
+				gfx_text_color(0.75f,0.5f,0.75f, 1); // spectator
 			
-		// render name
-		gfx_text_ex(&cursor, lines[r].name, -1);
+			// render name
+			if(!lines[r].spam && !lines[r].ignore)
+			{
+				if(config.cl_render_chat && !config.cl_render_servermsg && !(lines[r].client_id == -1))
+					gfx_text_ex(&cursor, lines[r].name, -1);
+				else if(!config.cl_render_chat && config.cl_render_servermsg && (lines[r].client_id == -1))
+					gfx_text_ex(&cursor, lines[r].name, -1);
+				else if(config.cl_render_chat && config.cl_render_servermsg)
+					gfx_text_ex(&cursor, lines[r].name, -1);
+			}
 
-		// render line
-		gfx_text_color(1,1,1,1);
-		if(lines[r].client_id == -1)
-			gfx_text_color(1,1,0.5f,1); // system
-		else if(lines[r].team)
-			gfx_text_color(0.65f,1,0.65f,1); // team message
-
-		gfx_text_ex(&cursor, lines[r].text, -1);
+			// render line
+			if(lines[r].contains_name && config.cl_change_color)
+				gfx_text_color(0.6f,0.6f,0.6f,1); // standard color if name
+			else
+				gfx_text_color(1,1,1,1);
+			if(lines[r].client_id == -1)
+				gfx_text_color(1,1,0.5f,1); // system
+			else if(lines[r].team && lines[r].contains_name && config.cl_change_color)
+				gfx_text_color(0.3f,1,0.3f,1); // team color if name
+			else if(lines[r].team)
+				gfx_text_color(0.65f,1,0.65f,1); // team message
+			
+			if(!lines[r].spam && !lines[r].ignore)
+			{
+				if(config.cl_render_chat && !config.cl_render_servermsg && !(lines[r].client_id == -1))
+					gfx_text_ex(&cursor, lines[r].text, -1);
+				else if(!config.cl_render_chat && config.cl_render_servermsg && (lines[r].client_id == -1))
+					gfx_text_ex(&cursor, lines[r].text, -1);
+				else if(config.cl_render_chat && config.cl_render_servermsg)
+					gfx_text_ex(&cursor, lines[r].text, -1);
+			}
+		}
 	}
 
 	gfx_text_color(1,1,1,1);

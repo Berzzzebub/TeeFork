@@ -33,17 +33,21 @@ void MENUS::render_demoplayer(RECT main_view)
 	float total_height;
 	
 	if(menu_active)
+	{
 		total_height = seekbar_height+buttonbar_height+margins*3;
+	/*
 	else
 		total_height = seekbar_height+margins*2;
+	*/
 	
-	ui_hsplit_b(&main_view, total_height, 0, &main_view);
-	ui_vsplit_l(&main_view, 250.0f, 0, &main_view);
-	ui_vsplit_r(&main_view, 250.0f, &main_view, 0);
+		ui_hsplit_b(&main_view, total_height, 0, &main_view);
+		ui_vsplit_l(&main_view, 250.0f, 0, &main_view);
+		ui_vsplit_r(&main_view, 250.0f, &main_view, 0);
 	
-	ui_draw_rect(&main_view, color_tabbar_active, CORNER_T, 10.0f);
+		ui_draw_rect(&main_view, color_tabbar_active, CORNER_T, 10.0f);
 		
-	ui_margin(&main_view, 5.0f, &main_view);
+		ui_margin(&main_view, 5.0f, &main_view);
+	}
 	
 	RECT seekbar, buttonbar;
 	
@@ -52,10 +56,13 @@ void MENUS::render_demoplayer(RECT main_view)
 		ui_hsplit_t(&main_view, seekbar_height, &seekbar, &buttonbar);
 		ui_hsplit_t(&buttonbar, margins, 0, &buttonbar);
 	}
+	/*
 	else
 		seekbar = main_view;
-
+	*/
+	
 	// do seekbar
+	if(menu_active)
 	{
 		static int seekbar_id = 0;
 		void *id = &seekbar_id;
