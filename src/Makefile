@@ -1,5 +1,5 @@
 # Author and Copyright: Bohdan Turkynewych 2009-2010, <tb0hdan@gmail.com
-# Compiles with GPLv2 license.
+# Compiles with modified BSD license.
 # See GPL.txt
 #C:\Users\Zet\Documents\Visual Studio 2008\Projects\Tee\Tee\srcC:\Users\Zet\Documents\Visual Studio 2008\Projects\Tee\Tee\other\sdl\includeC:\Users\Zet\Documents\Visual Studio 2008\Projects\Tee\Tee\src\engine\external\zlibC:\Users\Zet\Documents\Visual Studio 2008\Projects\Tee\Tee\data
 ####

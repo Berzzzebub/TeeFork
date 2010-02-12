@@ -1,5 +1,5 @@
 # Author: Bohdan Turkynewych, 2009-2010, <tb0hdan@gmail.com>
-# Complies with GPLv2 license.
+# Complies with modified BSD license.
 # See COPYRIGHT file.
 # Thanks very much to: http://www.advancedlinuxprogramming.com/
 
