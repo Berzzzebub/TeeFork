@@ -457,6 +457,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\src\game\client\components\menus_teecomp.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\src\game\client\components\motd.cpp"
 				>
 			</File>
@@ -481,6 +485,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\src\game\client\components\race_demo.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\src\game\client\render.cpp"
 				>
 			</File>
@@ -502,6 +510,14 @@
 			</File>
 			<File
 				RelativePath=".\src\base\system.c"
+				>
+			</File>
+			<File
+				RelativePath=".\src\game\client\teecomp.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\src\game\client\components\teecomp_stats.cpp"
 				>
 			</File>
 			<File
@@ -747,6 +763,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\src\game\client\components\race_demo.hpp"
+				>
+			</File>
+			<File
 				RelativePath=".\src\game\client\render.hpp"
 				>
 			</File>
@@ -764,6 +784,18 @@
 			</File>
 			<File
 				RelativePath=".\src\base\system.h"
+				>
+			</File>
+			<File
+				RelativePath=".\src\game\client\teecomp.hpp"
+				>
+			</File>
+			<File
+				RelativePath=".\src\game\client\components\teecomp_stats.hpp"
+				>
+			</File>
+			<File
+				RelativePath=".\src\game\teecomp_vars.hpp"
 				>
 			</File>
 			<File
