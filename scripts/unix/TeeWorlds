@@ -1,0 +1,51 @@
+#!/bin/sh
+
+TEEDIR="/home/teeworlds"
+GAME_DIR=${TEEDIR}/teeworlds-0.5.2-linux_x86
+GAME_BINARY="teeworlds_srv"
+
+function my_fork() {
+
+curdir=`pwd`
+
+cd ${GAME_DIR}
+
+./${GAME_BINARY} -f ${TEEDIR}/.teeworlds/auto8303.cfg >> ${GAME_DIR}/server8303.log &
+#./${GAME_BINARY} -f ${TEEDIR}/.tee8304/auto8304.cfg   >> ${GAME_DIR}/server8304.log &
+#./${GAME_BINARY} -f ${TEEDIR}/.tee8305/auto8305.cfg   >> ${GAME_DIR}/server8305.log &
+
+sleep 2
+
+cd ${TEEDIR}
+
+}
+
+function another_fork() {
+
+while  [ 1 ]; 	do
+    
+    sleep 2
+
+    if [ ! -d ${TEEDIR}/tmp ]; then
+	mkdir -p ${TEEDIR}/tmp
+    fi
+
+    if [ -f ${TEEDIR}/tmp/restart ]; then
+	
+	killall ${GAME_BINARY}
+	rm ${TEEDIR}/tmp/restart
+    fi
+    
+    isrunning=`ps ax|grep "${GAME_BINARY}"|grep -v 'grep'`
+    
+    if [ "${isrunning}" = "" ]; then
+    
+    my_fork
+    
+    fi
+    
+done
+	
+}
+
+another_fork &
