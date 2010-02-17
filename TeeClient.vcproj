@@ -509,6 +509,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\src\game\client\components\speedtailind.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\src\base\system.c"
 				>
 			</File>
@@ -780,6 +784,10 @@
 			</File>
 			<File
 				RelativePath=".\src\game\client\components\sounds.hpp"
+				>
+			</File>
+			<File
+				RelativePath=".\src\game\client\components\speedtailind.h"
 				>
 			</File>
 			<File

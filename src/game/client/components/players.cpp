@@ -13,8 +13,10 @@
 #include <game/client/components/effects.hpp>
 #include <game/client/components/sounds.hpp>
 #include <game/client/components/controls.hpp>
+#include <game/client/components/speedtailind.hpp>
 
 #include "players.hpp"
+#include "camera.hpp"
 
 void PLAYERS::render_hand(TEE_RENDER_INFO *info, vec2 center_pos, vec2 dir, float angle_offset, vec2 post_rot_offset)
 {
@@ -184,6 +186,8 @@ void PLAYERS::render_player(
 	
 	vec2 direction = get_direction((int)(angle*256.0f));
 	vec2 position = mix(vec2(prev.x, prev.y), vec2(player.x, player.y), intratick);
+	if(config.cl_speedtail && gameclient.camera->center == position)
+		gameclient.speedtailind->create(position);
 	vec2 vel = mix(vec2(prev.vx/256.0f, prev.vy/256.0f), vec2(player.vx/256.0f, player.vy/256.0f), intratick);
 	
 	gameclient.flow->add(position, vel*100.0f, 10.0f);

@@ -190,6 +190,7 @@ public:
 	class FLOW *flow;
 	class CHAT *chat;
 	class DAMAGEIND *damageind;
+	class SPEEDTAILIND *speedtailind;
 	class CAMERA *camera;
 	class CONTROLS *controls;
 	class EFFECTS *effects;

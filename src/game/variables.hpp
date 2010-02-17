@@ -76,6 +76,10 @@ MACRO_CONFIG_INT(gfx_noclip, 0, 0, 1, CFGFLAG_CLIENT|CFGFLAG_SAVE, "Disable clip
 /* TeeComp */
 #include "teecomp_vars.hpp"
 
+/* Speedtail */
+MACRO_CONFIG_INT(cl_speedtail, 0, 0, 1, CFGFLAG_CLIENT, "Turnes speedtail on or off")
+MACRO_CONFIG_INT(cl_speedtail_sens, 45, 1, 100, CFGFLAG_CLIENT, "Color sensitivity")
+
 /* server */
 MACRO_CONFIG_INT(sv_warmup, 0, 0, 0, CFGFLAG_SERVER, "Number of seconds to do warpup before round starts")
 MACRO_CONFIG_STR(sv_motd, 900, "", CFGFLAG_SERVER, "Message of the day to display for the clients")

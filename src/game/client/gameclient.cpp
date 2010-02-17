@@ -17,6 +17,7 @@
 #include "components/console.hpp"
 #include "components/controls.hpp"
 #include "components/damageind.hpp"
+#include "components/speedtailind.hpp"
 #include "components/debughud.hpp"
 #include "components/effects.hpp"
 #include "components/emoticon.hpp"
@@ -61,6 +62,7 @@ static SCOREBOARD scoreboard;
 static SOUNDS sounds;
 static EMOTICON emoticon;
 static DAMAGEIND damageind;
+static SPEEDTAILIND speedtailind;
 static VOTING voting;
 static TEECOMP_STATS teecomp_stats;
 static RACE race;
@@ -117,6 +119,7 @@ void GAMECLIENT::on_console_init()
 	sounds = &::sounds;
 	motd = &::motd;
 	damageind = &::damageind;
+	speedtailind = &::speedtailind;
 	mapimages = &::mapimages;
 	voting = &::voting;
 	teecomp_stats = &::teecomp_stats;
@@ -143,6 +146,7 @@ void GAMECLIENT::on_console_init()
 	all.add(&nameplates);
 	all.add(&particles->render_general);
 	all.add(damageind);
+	all.add(speedtailind);
 	all.add(&hud);
 	all.add(&emoticon);
 	all.add(&killmessages);
