@@ -7,6 +7,7 @@
 #include "character.hpp"
 #include "laser.hpp"
 #include "projectile.hpp"
+#include "../gamemodes/kvach.hpp"
 
 struct INPUT_COUNT
 {
@@ -426,9 +427,9 @@ void CHARACTER::fire_weapon()
 		} break;
 		
 	}
-
-	if(weapons[active_weapon].ammo > 0) // -1 == unlimited
-		weapons[active_weapon].ammo--;
+	if(!config.sv_infinity_ammo)
+		if(weapons[active_weapon].ammo > 0) // -1 == unlimited
+			weapons[active_weapon].ammo--;
 	attack_tick = server_tick();
 	if(!reload_timer)
 		reload_timer = data->weapons.id[active_weapon].firedelay * server_tickspeed() / 1000;
@@ -682,6 +683,8 @@ void CHARACTER::die(int killer, int weapon)
 	dead = true;
 	*/
 	
+	if(mode_special == 1)
+		return;
 	// this is for auto respawn after 3 secs
 	player->die_tick = server_tick();
 	
@@ -698,6 +701,12 @@ bool CHARACTER::take_damage(vec2 force, int dmg, int from, int weapon)
 {
 	core.vel += force;
 	
+	if(!str_comp_nocase(game.controller->gametype, "kvach"))
+	{
+		((GAMECONTROLLER_KVACH*)game.controller)->damage_calculate(this, dmg, game.players[from]->get_character(), weapon);
+		return false;
+	}
+
 	if(game.controller->is_friendly_fire(player->client_id, from) && !config.sv_teamdamage)
 		return false;
 
@@ -719,30 +728,31 @@ bool CHARACTER::take_damage(vec2 force, int dmg, int from, int weapon)
 		game.create_damageind(pos, 0, dmg);
 	}
 
-	if(dmg)
-	{
-		if(armor)
+	if(!config.sv_immortals)
+		if(dmg)
 		{
-			if(dmg > 1)
+			if(armor)
 			{
-				health--;
-				dmg--;
+				if(dmg > 1)
+				{
+					health--;
+					dmg--;
+				}
+
+				if(dmg > armor)
+				{
+					dmg -= armor;
+					armor = 0;
+				}
+				else
+				{
+					armor -= dmg;
+					dmg = 0;
+				}
 			}
-			
-			if(dmg > armor)
-			{
-				dmg -= armor;
-				armor = 0;
-			}
-			else
-			{
-				armor -= dmg;
-				dmg = 0;
-			}
+
+			health -= dmg;
 		}
-		
-		health -= dmg;
-	}
 
 	damage_taken_tick = server_tick();
 

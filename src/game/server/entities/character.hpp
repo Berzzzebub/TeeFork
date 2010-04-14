@@ -23,6 +23,9 @@ public:
 	// player controlling this character
 	class PLAYER *player;
 	
+	//Kvach
+	int damage_bonus;
+
 	bool alive;
 
 	// weapon info

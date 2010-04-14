@@ -22,6 +22,7 @@ extern "C"
 #include "gamemodes/tdm.hpp"
 #include "gamemodes/ctf.hpp"
 #include "gamemodes/mod.hpp"
+#include "gamemodes/kvach.hpp"
 
 TUNING_PARAMS tuning;
 
@@ -537,6 +538,8 @@ void mods_init()
 		game.controller = new GAMECONTROLLER_CTF;
 	else if(strcmp(config.sv_gametype, "tdm") == 0)
 		game.controller = new GAMECONTROLLER_TDM;
+	else if(strcmp(config.sv_gametype, "kvach") == 0)
+		game.controller = new GAMECONTROLLER_KVACH;
 	else
 		game.controller = new GAMECONTROLLER_DM;
 

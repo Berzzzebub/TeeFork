@@ -77,8 +77,8 @@ MACRO_CONFIG_INT(gfx_noclip, 0, 0, 1, CFGFLAG_CLIENT|CFGFLAG_SAVE, "Disable clip
 #include "teecomp_vars.hpp"
 
 /* Speedtail */
-MACRO_CONFIG_INT(cl_speedtail, 0, 0, 1, CFGFLAG_CLIENT, "Turnes speedtail on or off")
-MACRO_CONFIG_INT(cl_speedtail_sens, 45, 1, 100, CFGFLAG_CLIENT, "Color sensitivity")
+MACRO_CONFIG_INT(cl_speedtail, 0, 0, 1, CFGFLAG_CLIENT|CFGFLAG_SAVE, "Turnes speedtail on or off")
+MACRO_CONFIG_INT(cl_speedtail_sens, 45, 1, 100, CFGFLAG_CLIENT|CFGFLAG_SAVE, "Color sensitivity")
 
 /* server */
 MACRO_CONFIG_INT(sv_warmup, 0, 0, 0, CFGFLAG_SERVER, "Number of seconds to do warpup before round starts")
@@ -100,6 +100,11 @@ MACRO_CONFIG_INT(sv_vote_kick, 1, 0, 1, CFGFLAG_SERVER, "Allow voting to kick pl
 MACRO_CONFIG_INT(sv_vote_kick_bantime, 5, 0, 1440, CFGFLAG_SERVER, "The time to ban a player if kicked by vote. 0 makes it just use kick")
 MACRO_CONFIG_INT(sv_vote_scorelimit, 0, 0, 1, CFGFLAG_SERVER, "Allow voting to change score limit")
 MACRO_CONFIG_INT(sv_vote_timelimit, 0, 0, 1, CFGFLAG_SERVER, "Allow voting to change time limit")
+
+/* ghithor mod */
+MACRO_CONFIG_INT(sv_immortals, 0, 0, 1, CFGFLAG_SERVER, "Make tees immortal: 0 - no, 1 - yes.")
+MACRO_CONFIG_INT(sv_infinity_ammo, 0, 0, 1, CFGFLAG_SERVER, "Infinity ammo: 0 - off, 1 - on.")
+MACRO_CONFIG_INT(sv_immune_to_kvach, 1500, 0, 60000, CFGFLAG_SERVER, "0 - Disable; 1 - Enable;")
 
 /* Beep-Mod */
 MACRO_CONFIG_INT(cl_change_sound, 1, 0, 1, CFGFLAG_CLIENT|CFGFLAG_SAVE, "Turns special chat sound on or off")
