@@ -11,13 +11,33 @@ GAMECONTROLLER_KTF::GAMECONTROLLER_KTF()
 	flag = 0;
 	flag_keeper_id = -100;
 	//flag = new FLAG(0);
-	stand_type = 0;
-	shift = 0;
 	
 	gametype = "KTF";
 	game_flags = GAMEFLAG_FLAGS;
 	
 	point_counter = 0;
+}
+
+void GAMECONTROLLER_KTF::update_colors()
+{
+	for(int i = 0; i < MAX_CLIENTS; i++)
+	{
+		PLAYER* player = game.players[i];
+		if(player && player->team != -1)
+		{				
+			player->use_custom_color = 1;
+			if(player->client_id == flag_keeper_id)
+			{//Set Flagkeeper color
+				player->color_body = 10223467;
+				player->color_feet = 10223467;				
+			}
+			else
+			{//Set regular tee color
+				player->color_body = 65387;
+				player->color_feet = 65387;
+			}
+		}
+	}
 }
 
 void GAMECONTROLLER_KTF::set_new_flagkeeper()
@@ -145,11 +165,14 @@ void GAMECONTROLLER_KTF::tick()
 				flag->at_stand = 0;
 				flag->carrying_character = close_characters[i];
 
+				flag_keeper_id = flag->carrying_character->player->client_id;
+				update_colors();
+
 				// tell everyone
 				char buf[512];
 				str_format(buf, sizeof(buf), "%s got the flag!", server_clientname(flag->carrying_character->player->client_id));
 				game.send_broadcast(buf, -1);
-				
+				update_colors();
 				dbg_msg("game", "flag_grab player='%d:%s'",
 					flag->carrying_character->player->client_id,
 					server_clientname(flag->carrying_character->player->client_id));
@@ -205,27 +228,6 @@ void GAMECONTROLLER_KTF::tick()
 	GAMECONTROLLER::tick();
 }
 
-//bool GAMECONTROLLER_KTF::on_entity(int index, vec2 pos)
-//{
-//	//// first, look for real flag stands
-//	//if ( (index == ENTITY_FLAGSTAND_RED || index == ENTITY_FLAGSTAND_BLUE) && stand_type != STAND_FLAGSTAND )
-//	//	change_flag_stand(pos, STAND_FLAGSTAND);
-//
-//	//// then look for ninja as flag stand
-//	//if ( index == ENTITY_POWERUP_NINJA && stand_type < STAND_NINJA )
-//	//	change_flag_stand(pos, STAND_NINJA);
-//	//
-//	//// no flagstand and no ninja? use spawn point so HTF is playable
-//	//if ( (index == ENTITY_SPAWN || index == ENTITY_SPAWN_RED || index == ENTITY_SPAWN_BLUE) &&  stand_type <= STAND_SPAWN )
-//	//	change_flag_stand(pos, STAND_SPAWN);
-//
-//	// check default stuff
-//	if ( GAMECONTROLLER::on_entity(index, pos) )
-//		return true;
-//	
-//	return false;
-//}
-
 int GAMECONTROLLER_KTF::on_character_death(class CHARACTER *victim, class PLAYER *killer, int weaponid)
 {
 	CHARACTER *kill_char = killer->get_character();
@@ -252,18 +254,12 @@ int GAMECONTROLLER_KTF::on_character_death(class CHARACTER *victim, class PLAYER
 			str_format(buf, sizeof(buf), "%s lost the flag!", server_clientname(victim->player->client_id));
 		}
 		game.send_broadcast(buf, -1);
-		
+		flag_keeper_id = -100;
+		update_colors();
 		return 1;
 	}
 	
 	return 0;
-}
-
-void GAMECONTROLLER_KTF::change_flag_stand(vec2 pos, int type)
-{
-	flag->pos = pos;
-	flag->stand_pos = pos;
-	stand_type = type;
 }
 
 void GAMECONTROLLER_KTF::on_character_spawn(class CHARACTER *chr)
@@ -277,4 +273,5 @@ void GAMECONTROLLER_KTF::on_character_spawn(class CHARACTER *chr)
 			flag = new FLAG(0);
 		flag->pos = chr->pos;
 	}
+	update_colors();
 }
