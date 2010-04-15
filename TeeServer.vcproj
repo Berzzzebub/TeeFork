@@ -360,6 +360,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\src\game\server\gamemodes\ktf.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\src\game\server\entities\laser.cpp"
 				>
 			</File>
@@ -539,6 +543,10 @@
 			</File>
 			<File
 				RelativePath=".\src\engine\external\zlib\inftrees.h"
+				>
+			</File>
+			<File
+				RelativePath=".\src\game\server\gamemodes\ktf.hpp"
 				>
 			</File>
 			<File
