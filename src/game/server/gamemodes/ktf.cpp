@@ -26,7 +26,7 @@ void GAMECONTROLLER_KTF::update_colors()
 		if(player && player->team != -1)
 		{				
 			player->use_custom_color = 1;
-			if(player->client_id == flag_keeper_id)
+			if(flag->carrying_character && player->client_id == flag->carrying_character->player->client_id)
 			{//Set Flagkeeper color
 				player->color_body = 10223467;
 				player->color_feet = 10223467;				
@@ -91,6 +91,22 @@ void GAMECONTROLLER_KTF::draw_dir_stars()
 	}	
 }
 
+int GAMECONTROLLER_KTF::leader_score()
+{
+	int leader_score = -1;
+	for(int i = 0; i < MAX_CLIENTS; i++)
+	{
+		if(game.players[i] && game.players[i]->team > -1)
+		{				
+			if(game.players[i]->score > leader_score)
+			{
+				leader_score = game.players[i]->score;
+			}
+		}
+	}
+	return leader_score;
+}
+
 void GAMECONTROLLER_KTF::tick()
 {
 	// game still running?
@@ -123,9 +139,11 @@ void GAMECONTROLLER_KTF::tick()
 			
 			// add 1 point per second for carrier
 			point_counter++;
-			if ( point_counter == 60 )
+			int factor = (leader_score() - flag->carrying_character->player->score)/(config.sv_scorelimit*10/100) + 1;
+
+			if ( point_counter == 60/factor )
 			{		
-				//draw_dir_stars();
+				draw_dir_stars();
 				// is there more than one player?
 				//int num_players = 0;
 				CHARACTER *ents[64];
@@ -227,6 +245,11 @@ void GAMECONTROLLER_KTF::tick()
 	// do default stuff
 	GAMECONTROLLER::tick();
 }
+void GAMECONTROLLER_KTF::endround()
+{
+	flag_keeper_id = -100;
+	GAMECONTROLLER::endround();
+}
 
 int GAMECONTROLLER_KTF::on_character_death(class CHARACTER *victim, class PLAYER *killer, int weaponid)
 {
@@ -254,7 +277,6 @@ int GAMECONTROLLER_KTF::on_character_death(class CHARACTER *victim, class PLAYER
 			str_format(buf, sizeof(buf), "%s lost the flag!", server_clientname(victim->player->client_id));
 		}
 		game.send_broadcast(buf, -1);
-		flag_keeper_id = -100;
 		update_colors();
 		return 1;
 	}

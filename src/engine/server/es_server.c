@@ -1012,6 +1012,17 @@ static int server_load_map(const char *mapname)
 	return 1;
 }
 
+int try_netserver_open(NETADDR bindaddr)
+{
+	 net =  netserver_open(bindaddr, config.sv_max_clients, 0);
+	 if(!net)
+		{
+			bindaddr.port++;
+			dbg_msg("server", "couldn't open socket. port might already be in use");
+			try_netserver_open(bindaddr);
+		}
+}
+
 static int server_run()
 {
 	NETADDR bindaddr;
@@ -1042,7 +1053,7 @@ static int server_run()
 		bindaddr.port = config.sv_port;
 	}
 	
-	net = netserver_open(bindaddr, config.sv_max_clients, 0);
+	/*net = */try_netserver_open(bindaddr);
 	if(!net)
 	{
 		dbg_msg("server", "couldn't open socket. port might already be in use");
@@ -1348,6 +1359,7 @@ static void server_register_commands()
 
 int main(int argc, char **argv)
 {
+	char s[81];
 #if defined(CONF_FAMILY_WINDOWS)
 	int i;
 	for(i = 1; i < argc; i++)
@@ -1359,6 +1371,7 @@ int main(int argc, char **argv)
 		}
 	}
 #endif
+	dbg_msg("server", "argc = '%d'", argc);
 
 	/* init the engine */
 	dbg_msg("server", "starting...");
@@ -1373,6 +1386,7 @@ int main(int argc, char **argv)
 	
 	/* run the server */
 	server_run();
+	scanf("%s", s);
 	return 0;
 }
 
