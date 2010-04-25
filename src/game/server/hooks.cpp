@@ -21,6 +21,7 @@ extern "C"
 #include "gamemodes/dm.hpp"
 #include "gamemodes/tdm.hpp"
 #include "gamemodes/ctf.hpp"
+#include "gamemodes/ktf.hpp"
 #include "gamemodes/mod.hpp"
 #include "gamemodes/kvach.hpp"
 
@@ -536,6 +537,8 @@ void mods_init()
 		game.controller = new GAMECONTROLLER_MOD;
 	else if(strcmp(config.sv_gametype, "ctf") == 0)
 		game.controller = new GAMECONTROLLER_CTF;
+	else if(strcmp(config.sv_gametype, "ktf") == 0)
+		game.controller = new GAMECONTROLLER_KTF;
 	else if(strcmp(config.sv_gametype, "tdm") == 0)
 		game.controller = new GAMECONTROLLER_TDM;
 	else if(strcmp(config.sv_gametype, "kvach") == 0)

@@ -64,8 +64,8 @@ public:
 	
 	void do_warmup(int seconds);
 	
-	void startround();
-	void endround();
+	virtual void startround();
+	virtual void endround();
 	void change_map(const char *to_map);
 	
 	bool is_friendly_fire(int cid1, int cid2);

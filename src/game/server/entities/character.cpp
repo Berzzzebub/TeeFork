@@ -3,6 +3,7 @@
 #include <engine/e_config.h>
 #include <game/server/gamecontext.hpp>
 #include <game/mapitems.hpp>
+#include <game/server/gamemodes/ktf.hpp>
 
 #include "character.hpp"
 #include "laser.hpp"
@@ -709,6 +710,13 @@ bool CHARACTER::take_damage(vec2 force, int dmg, int from, int weapon)
 
 	if(game.controller->is_friendly_fire(player->client_id, from) && !config.sv_teamdamage)
 		return false;
+
+	if(!str_comp_nocase(game.controller->gametype, "ktf"))
+	{
+		int keeper_id = ((GAMECONTROLLER_KTF*)game.controller)->flag_keeper_id;
+		if(!((player->client_id == keeper_id) || (from == player->client_id) || (from == keeper_id)))
+		return false;
+	}
 
 	// player only inflicts half damage on self
 	if(from == player->client_id)
