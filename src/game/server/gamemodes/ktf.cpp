@@ -139,7 +139,12 @@ void GAMECONTROLLER_KTF::tick()
 			
 			// add 1 point per second for carrier
 			point_counter++;
-			int factor = (leader_score() - flag->carrying_character->player->score)/(config.sv_scorelimit*10/100) + 1;
+			int factor;
+			if((config.sv_scorelimit*10/100) > 0)
+				factor = (leader_score() - flag->carrying_character->player->score)/(config.sv_scorelimit*10/100) + 1;
+			else
+				factor = 1;
+
 
 			if ( point_counter == 60/factor )
 			{		
@@ -163,6 +168,9 @@ void GAMECONTROLLER_KTF::tick()
 				{
 					// add score
 					flag->carrying_character->player->score += num_players - 1;
+					char buf[64];
+					str_format(buf, sizeof(buf), "%d", flag->carrying_character->player->score);
+					game.send_broadcast(buf, flag->carrying_character->player->client_id);
 				}
 
 				point_counter = 0;
@@ -222,6 +230,7 @@ void GAMECONTROLLER_KTF::tick()
 					flag->reset();
 					flag->pos = game.players[flag_keeper_id]->get_character()->pos;
 					flag->stand_pos = flag->pos;
+					flag->at_stand = 0;
 				}
 				else
 				{
@@ -247,8 +256,18 @@ void GAMECONTROLLER_KTF::tick()
 }
 void GAMECONTROLLER_KTF::endround()
 {
-	flag_keeper_id = -100;
 	GAMECONTROLLER::endround();
+	flag_keeper_id = -100;
+	/*flag->at_stand = 0;*/
+	//flag->destroy();
+	//flag = 0;
+}
+
+void GAMECONTROLLER_KTF::startround()
+{
+	GAMECONTROLLER::startround();
+	flag->destroy();
+	flag = 0;
 }
 
 int GAMECONTROLLER_KTF::on_character_death(class CHARACTER *victim, class PLAYER *killer, int weaponid)
@@ -262,6 +281,7 @@ int GAMECONTROLLER_KTF::on_character_death(class CHARACTER *victim, class PLAYER
 		flag->drop_tick				= server_tick();
 		flag->carrying_character	= 0;
 		flag->vel					= vec2(0,0);
+		flag_keeper_id = -100;
 		
 		// reset counter so new carrier has also to wait for a second to get first point
 		point_counter				= 0;
@@ -288,7 +308,7 @@ void GAMECONTROLLER_KTF::on_character_spawn(class CHARACTER *chr)
 {
 	// do default stuff
 	GAMECONTROLLER::on_character_spawn(chr);
-	if(flag_keeper_id == -100 || !flag)
+	if(flag_keeper_id == -100 && !flag)
 	{
 		flag_keeper_id = chr->player->client_id;
 		if(!flag)

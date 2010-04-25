@@ -64,7 +64,7 @@ public:
 	
 	void do_warmup(int seconds);
 	
-	void startround();
+	virtual void startround();
 	virtual void endround();
 	void change_map(const char *to_map);
 	

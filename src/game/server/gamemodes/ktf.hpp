@@ -12,6 +12,7 @@ public:
 	virtual int on_character_death(class CHARACTER *victim, class PLAYER *killer, int weapon);
 	virtual void on_character_spawn(class CHARACTER *chr);
 	virtual void endround();
+	virtual void startround();
 
 	void set_new_flagkeeper();
 	void draw_dir_stars();
