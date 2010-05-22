@@ -11,6 +11,8 @@ public:
 	int leader_client_id;
 	int last_kvacher_client_id;
 	int invinsible_tick;
+	int point_counter;
+	int hook_point_counter;
 
 
 	GAMECONTROLLER_KVACH();
@@ -19,6 +21,8 @@ public:
 	virtual void on_character_spawn(class CHARACTER *chr);
 	virtual void on_player_info_change(class PLAYER *p);
 	virtual int on_character_death(class CHARACTER *victim, class PLAYER *killer, int weapon);
+	virtual void endround();
+
 	// add more virtual functions here if you wish
 	void explosion_calculate(vec2 p, int owner, int weapon, bool bnodamage);
 	void damage_calculate(class CHARACTER *chrTo, int dmg, class CHARACTER *chrFrom, int weapon);
@@ -28,4 +32,6 @@ public:
 	void update_equipment();
 	bool timer_going(int timerTick, int timerLife);
 	void update_colors();
-};
+	void create_explosion(vec2 p, int owner, int weapon, bool bnodamage);
+	void character_tick(CHARACTER* character);
+};	

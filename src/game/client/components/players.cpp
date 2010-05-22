@@ -186,8 +186,12 @@ void PLAYERS::render_player(
 	
 	vec2 direction = get_direction((int)(angle*256.0f));
 	vec2 position = mix(vec2(prev.x, prev.y), vec2(player.x, player.y), intratick);
-	if(config.cl_speedtail && gameclient.camera->center == position)
+	static int tiks = 0;
+	if(config.cl_speedtail && gameclient.camera->center == position && tiks++ >= 1)
+	{
 		gameclient.speedtailind->create(position);
+		tiks = 0;
+	}
 	vec2 vel = mix(vec2(prev.vx/256.0f, prev.vy/256.0f), vec2(player.vx/256.0f, player.vy/256.0f), intratick);
 	
 	gameclient.flow->add(position, vel*100.0f, 10.0f);

@@ -298,10 +298,8 @@ int GAMECONTROLLER_KTF::on_character_death(class CHARACTER *victim, class PLAYER
 		}
 		game.send_broadcast(buf, -1);
 		update_colors();
-		return 1;
 	}
-	
-	return 0;
+	return GAMECONTROLLER::on_character_death(victim, killer, weaponid);
 }
 
 void GAMECONTROLLER_KTF::on_character_spawn(class CHARACTER *chr)

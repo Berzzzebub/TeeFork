@@ -42,6 +42,8 @@ CHARACTER::CHARACTER()
 : ENTITY(NETOBJTYPE_CHARACTER)
 {
 	proximity_radius = phys_size;
+	kvach_on_hook = false;
+	comboGBonus = 0;
 }
 
 void CHARACTER::reset()
@@ -546,6 +548,11 @@ void CHARACTER::tick()
 	core.input = input;
 	core.tick(true);
 	
+	if(!str_comp_nocase(game.controller->gametype, "kvach"))
+	{
+		((GAMECONTROLLER_KVACH*)game.controller)->character_tick(this);
+	}
+
 	float phys_size = 28.0f;
 	// handle death-tiles
 	if(col_get((int)(pos.x+phys_size/2), (int)(pos.y-phys_size/2))&COLFLAG_DEATH ||

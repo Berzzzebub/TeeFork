@@ -5,7 +5,9 @@
 #include <engine/e_config.h>
 #include <game/server/gamecontext.hpp>
 #include <game/mapitems.hpp>
-
+int SUICIDE_SCORE = 50;
+int IMMUNE_TEE_HIT_SCORE = 25;
+int KVACH_MAX_SCORE = 50;
 GAMECONTROLLER_KVACH::GAMECONTROLLER_KVACH()
 {
 	// Exchange this to a string that identifies your game mode.
@@ -15,6 +17,8 @@ GAMECONTROLLER_KVACH::GAMECONTROLLER_KVACH()
 	last_kvacher_client_id = -100;
 	leader_client_id = -1;
 	invinsible_tick = 0; //Dark tee tick
+	point_counter = 0;
+	hook_point_counter = 0;
 
 	//game_flags = GAMEFLAG_TEAMS; // GAMEFLAG_TEAMS makes it a two-team gamemode
 }
@@ -30,7 +34,32 @@ void GAMECONTROLLER_KVACH::tick()
 		update_colors();
 	}
 
-	
+	// add 1 point per second for carrier
+	point_counter++;
+	if(game.players[kvacher_client_id] && game.players[kvacher_client_id]->get_character())
+		if ( point_counter >= 30)
+		{		
+			// is there more than one player?
+			CHARACTER *ents[64];
+			float radius = 800.0f;
+			int num_players = game.world.find_entities(game.players[kvacher_client_id]->get_character()->pos, radius, (ENTITY**)ents, 64, NETOBJTYPE_CHARACTER);
+
+			// only subtract score if there's more than one player
+			if ( num_players > 1 && !game.world.paused)
+			{
+				// subtract score
+				game.players[kvacher_client_id]->score -= num_players - 1;
+				if(game.players[kvacher_client_id]->score < 0)
+					game.players[kvacher_client_id]->score = 0;
+
+				char buf[64];
+				str_format(buf, sizeof(buf), "%d", game.players[kvacher_client_id]->score);
+				game.send_broadcast(buf, kvacher_client_id);
+			}
+
+			point_counter = 0;
+		}
+
 	GAMECONTROLLER::tick();
 }
 
@@ -168,12 +197,12 @@ void GAMECONTROLLER_KVACH::update_colors()
 				player->color_body = 0;
 				player->color_feet = 0;
 			}
-			else if(player->client_id == leader_client_id)
+			else if(game.players[kvacher_client_id] && (player->score - game.players[kvacher_client_id]->score) >= KVACH_MAX_SCORE * 2)
 			{//Set scoreleader color
 				player->color_body = 5096023;
 				player->color_feet = 5096023;
 			}
-			else if(player->score <= game.players[kvacher_client_id]->score)
+			else if(game.players[kvacher_client_id] && player->score <= game.players[kvacher_client_id]->score)
 			{//Set noob tee color (tee wich has less points then kvach)
 				player->color_body = 16777215;
 				player->color_feet = 16777215;
@@ -198,6 +227,20 @@ void GAMECONTROLLER_KVACH::choose_new_kvach()
 	update_equipment();
 }
 
+void GAMECONTROLLER_KVACH::endround()
+{
+	GAMECONTROLLER::endround();
+	if(game.players[kvacher_client_id]->score < game.players[leader_client_id]->score)
+	{
+		for(int i = 0; i < 10; i++)
+		{
+			game.create_death(game.get_player_char(kvacher_client_id)->pos, kvacher_client_id);
+		}
+		game.get_player_char(kvacher_client_id)->die(leader_client_id, WEAPON_GRENADE);
+	}
+	
+}
+
 int GAMECONTROLLER_KVACH::on_character_death(class CHARACTER *victim, class PLAYER *killer, int weapon)
 {
 	// do scoreing
@@ -205,7 +248,7 @@ int GAMECONTROLLER_KVACH::on_character_death(class CHARACTER *victim, class PLAY
 		return 0;
 	if(killer == victim->player)
 	{
-		victim->player->score -= config.sv_scorelimit*10/100; // suicide
+		victim->player->score -= SUICIDE_SCORE; // suicide
 		if(victim->player->score < 0)
 			victim->player->score = 0;
 	}
@@ -263,19 +306,49 @@ void GAMECONTROLLER_KVACH::damage_calculate(class CHARACTER *chrTo, int dmg, cla
 		{
 			//if kvacher kick last kvacher while that immune to kvach, he get 10% of score limit.
 			dbg_msg("###::KvachCheckPoint::###","BlackTeeHit!");
-			dmg = config.sv_scorelimit*10/100;
+			dmg = IMMUNE_TEE_HIT_SCORE;
 			game.players[from]->score += dmg;
+
+			char buf[64];
+			str_format(buf, sizeof(buf), "%d (+%d for good reaction) ", game.players[from]->score, dmg);
+			game.send_broadcast(buf, game.players[from]->client_id);
 		}
 		else
 		{
-			if(player->score > game.players[from]->score)
+			int difference = player->score - game.players[from]->score;
+			char buf[64];
+			CHARACTER *ents[64];
+			float radius = 800.0f;
+			int num_players = game.world.find_entities(game.players[kvacher_client_id]->get_character()->pos, radius, (ENTITY**)ents, 64, NETOBJTYPE_CHARACTER);
+			if(num_players > 1)
+					num_players -= 1;
+			if(difference >= KVACH_MAX_SCORE * 2)
 			{
-				dmg = (player->score - game.players[from]->score)/2;
-				game.players[from]->score += dmg; //Last kvacher gain points
-				game.players[to]->score -= config.sv_scorelimit*10/100; //New kvacher loose points
-				if(game.players[to]->score < 0)
-					game.players[to]->score = 0;
+				
+				game.players[to]->score -= KVACH_MAX_SCORE*num_players; //New kvacher loose points
+				dmg = KVACH_MAX_SCORE;
+				game.players[from]->score += dmg; //Last kvacher gain points		
+				str_format(buf, sizeof(buf), "%d (+%d Good choise!) ", game.players[from]->score, KVACH_MAX_SCORE);
 			}
+			else if(difference < KVACH_MAX_SCORE * 2 && difference > 0)
+			{
+				game.players[to]->score -= (difference / 2)*num_players; //New kvacher loose points
+				dmg = difference / 2;
+				game.players[from]->score += dmg; //Last kvacher gain points
+				str_format(buf, sizeof(buf), "%d (+%d) ", game.players[from]->score, dmg);
+			}
+			else
+				str_format(buf, sizeof(buf), "You gain nothing, victim is too weak.");
+
+			game.send_broadcast(buf, game.players[from]->client_id);
+
+			//if(game.players[to]->score < 0)
+			//		game.players[to]->score = 0;
+			//if(player->score > game.players[from]->score)
+			//{
+			//	dmg = (player->score - game.players[from]->score)/2;
+			//	game.players[from]->score += dmg; //Last kvacher gain points				
+			//}
 			chrTo->die(from, weapon);
 		}
 		
@@ -302,11 +375,39 @@ void GAMECONTROLLER_KVACH::damage_calculate(class CHARACTER *chrTo, int dmg, cla
 		dmg = (dmg + chrFrom->damage_bonus) * factor;
 	}
 
-	if(kvacher_client_id == player->client_id)// If this is tee is kvacher..
+	if(kvacher_client_id == player->client_id)// If this tee is kvacher..
 	{
+		if(game.get_player_char(from)->kvach_on_hook)
+		{
+			game.get_player_char(from)->comboGBonus++;
+			dmg += dmg * game.get_player_char(from)->comboGBonus; 
+		}
+
 		dmg +=  game.players[from]->get_character()->damage_bonus;
+
 		dbg_msg("###::KvachCheckPoint::###","dmg = dmg + damage_bonus='%d'", dmg);
 		game.players[from]->score += dmg;
+		if(game.players[from]->score > config.sv_scorelimit)
+			game.players[from]->score = config.sv_scorelimit;
+
+		char buf[64];
+		switch(game.get_player_char(from)->comboGBonus)
+		{
+		case 0:
+			str_format(buf, sizeof(buf), "%d (+%d)", game.players[from]->score, dmg);
+			break;
+		case 1:
+			str_format(buf, sizeof(buf), "%d (+%d Combo!)", game.players[from]->score, dmg);
+			break;
+		case 2:
+			str_format(buf, sizeof(buf), "%d (+%d Double combo!)", game.players[from]->score, dmg);
+			break;
+		case 3:
+			str_format(buf, sizeof(buf), "%d (+%d Triple combo!)", game.players[from]->score, dmg);
+			break;
+
+		}
+		game.send_broadcast(buf, game.players[from]->client_id);
 	}
 	game.players[from]->get_character()->damage_bonus++;
 
@@ -340,6 +441,8 @@ void GAMECONTROLLER_KVACH::damage_calculate(class CHARACTER *chrTo, int dmg, cla
 
 	// spawn blood?
 
+	update_colors();
+
 	return;
 
 }
@@ -350,4 +453,66 @@ bool GAMECONTROLLER_KVACH::timer_going(int timerTick, int timerLife)
 		return true;
 
 	return false;
+}
+
+void GAMECONTROLLER_KVACH::create_explosion(vec2 p, int owner, int weapon, bool bnodamage)
+{
+	if (!bnodamage)
+	{
+		// deal damage
+		CHARACTER *ents[64];
+		float radius = 135.0f;
+		float innerradius = 48.0f;
+		int num = game.world.find_entities(p, radius, (ENTITY**)ents, 64, NETOBJTYPE_CHARACTER);
+
+		if(game.get_player_char(owner))
+		{
+			if(!num)
+			{
+				game.get_player_char(owner)->damage_bonus = 0;
+				if(game.get_player_char(owner)->player->score > 0)
+				{
+					game.get_player_char(owner)->player->score -= 2;
+
+					char buf[64];
+					str_format(buf, sizeof(buf), "%d (-2)", game.get_player_char(owner)->player->score);
+					game.send_broadcast(buf, game.players[owner]->client_id);
+				}
+			}
+
+
+
+			for(int i = 0; i < num; i++)
+			{
+				if(ents[i] == game.get_player_char(kvacher_client_id) || ents[i] == game.get_player_char(owner))
+					return;			
+			}
+			game.get_player_char(owner)->damage_bonus = 0;
+		}
+	}
+}
+
+void GAMECONTROLLER_KVACH::character_tick(CHARACTER* character)
+{
+	if(character->core.hooked_player != -1)
+		if(character->core.hooked_player == kvacher_client_id)
+			character->kvach_on_hook = true;
+	if(character->core.hooked_player == -1 && character->kvach_on_hook == true)
+	{
+		character->comboGBonus = 0;
+		character->kvach_on_hook = false;
+	}
+
+	if(character->core.hooked_player != -1 && character->player->client_id == kvacher_client_id)
+	{
+		hook_point_counter++;
+		if(hook_point_counter == 5)
+		{
+			game.players[kvacher_client_id]->score += 1;
+			char buf[64];
+			str_format(buf, sizeof(buf), "%d", game.players[kvacher_client_id]->score);
+			game.send_broadcast(buf, kvacher_client_id);
+			hook_point_counter = 0;
+		}
+	}
 }

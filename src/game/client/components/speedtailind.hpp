@@ -8,7 +8,7 @@ class SPEEDTAILIND : public COMPONENT
 	{
 		vec2 pos;
 		float life;
-
+		float speed;
 		float r, g, b, a;
 	};
 

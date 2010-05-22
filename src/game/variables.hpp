@@ -78,7 +78,7 @@ MACRO_CONFIG_INT(gfx_noclip, 0, 0, 1, CFGFLAG_CLIENT|CFGFLAG_SAVE, "Disable clip
 
 /* Speedtail */
 MACRO_CONFIG_INT(cl_speedtail, 0, 0, 1, CFGFLAG_CLIENT|CFGFLAG_SAVE, "Turnes speedtail on or off")
-MACRO_CONFIG_INT(cl_speedtail_sens, 45, 1, 100, CFGFLAG_CLIENT|CFGFLAG_SAVE, "Color sensitivity")
+MACRO_CONFIG_INT(cl_speedtail_sens, 50, 1, 100, CFGFLAG_CLIENT|CFGFLAG_SAVE, "Color sensitivity")
 
 /* server */
 MACRO_CONFIG_INT(sv_warmup, 0, 0, 0, CFGFLAG_SERVER, "Number of seconds to do warpup before round starts")

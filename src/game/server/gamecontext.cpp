@@ -2,6 +2,7 @@
 #include <new>
 #include <engine/e_server_interface.h>
 #include "gamecontext.hpp"
+#include "game/server/gamemodes/kvach.hpp"
 
 GAMECONTEXT game;
 
@@ -83,8 +84,12 @@ void GAMECONTEXT::create_explosion(vec2 p, int owner, int weapon, bool bnodamage
 		float radius = 135.0f;
 		float innerradius = 48.0f;
 		int num = game.world.find_entities(p, radius, (ENTITY**)ents, 64, NETOBJTYPE_CHARACTER);
-		if(!num && game.get_player_char(owner))
-			game.get_player_char(owner)->damage_bonus = 0;
+
+		if(!str_comp_nocase(game.controller->gametype, "kvach"))
+		{
+			((GAMECONTROLLER_KVACH*)game.controller)->create_explosion(p, owner, weapon, bnodamage);
+		}
+		
 		for(int i = 0; i < num; i++)
 		{
 			vec2 diff = ents[i]->pos - p;

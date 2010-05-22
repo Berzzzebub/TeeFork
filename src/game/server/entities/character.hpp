@@ -25,6 +25,8 @@ public:
 	
 	//Kvach
 	int damage_bonus;
+	bool kvach_on_hook;
+	int comboGBonus;
 
 	bool alive;
 

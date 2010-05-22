@@ -37,6 +37,8 @@ void SPEEDTAILIND::create(vec2 pos)
 	static const int SMOOTH_TABLE_SIZE = 24;
 	static float smooth_table[SMOOTH_TABLE_SIZE];
 	static int smooth_index = 0;
+	static float last_speed = 0;
+	static float last_acceleration = 0;
 
 	smooth_table[smooth_index] = distance(pos, oldpos)/client_frametime();
 
@@ -57,13 +59,30 @@ void SPEEDTAILIND::create(vec2 pos)
 	{
 		i->pos = pos;
 		i->life = 1.5f;
+		i->speed = speed;
 
-		i->r = 1.0f + (speed - smooth_table[last_index])/config.cl_speedtail_sens;
-		i->g = 1.0f - (speed - smooth_table[last_index])/config.cl_speedtail_sens;
+		float velspeed = length(vec2(gameclient.snap.local_character->vx/256.0f, gameclient.snap.local_character->vy/256.0f))*50;
+		float acceleration =  velspeed - last_speed;
+		last_speed = velspeed;
+		if(acceleration)
+		{
+			char buf[64];
+			str_format(buf, sizeof(buf), "%f", acceleration);
+
+
+			float w = gfx_text_width(0, 14, buf, -1);
+			gfx_text(0, 150*gfx_screenaspect()-w/2, 35, 14, buf, -1);
+			dbg_msg("SpeedtailDebug", "acceleration = '%f'", acceleration);
+		}
+		else
+			if(last_acceleration)
+				acceleration = last_acceleration;
+		i->r = 1.0f + acceleration / 100;
+		i->g = 1.0f - acceleration / 100;
 		i->b = 0.0f;
 		i->a = 1.0f;
 
-
+		last_acceleration = acceleration;
 	}
 }
 
@@ -85,7 +104,10 @@ void SPEEDTAILIND::on_render()
 		{
 			gfx_setcolor(items[i].r, items[i].g, items[i].b, items[i].a);
 			select_sprite(SPRITE_PART4);
-			draw_sprite(pos.x, pos.y, 48.0f);
+			float factor = (items[i].speed/15);
+			if (factor < 0.5f)
+				factor = 0.5f;
+			draw_sprite(pos.x, pos.y, 0.5f * factor);
 			i++;
 		}
 	}
