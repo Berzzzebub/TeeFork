@@ -315,32 +315,32 @@ void GAMECONTROLLER_KVACH::damage_calculate(class CHARACTER *chrTo, int dmg, cla
 		}
 		else
 		{
-			int difference = player->score - game.players[from]->score;
-			char buf[64];
-			CHARACTER *ents[64];
-			float radius = 800.0f;
-			int num_players = game.world.find_entities(game.players[kvacher_client_id]->get_character()->pos, radius, (ENTITY**)ents, 64, NETOBJTYPE_CHARACTER);
-			if(num_players > 1)
-					num_players -= 1;
-			if(difference >= KVACH_MAX_SCORE * 2)
-			{
-				
-				game.players[to]->score -= KVACH_MAX_SCORE*num_players; //New kvacher loose points
-				dmg = KVACH_MAX_SCORE;
-				game.players[from]->score += dmg; //Last kvacher gain points		
-				str_format(buf, sizeof(buf), "%d (+%d Good choise!) ", game.players[from]->score, KVACH_MAX_SCORE);
-			}
-			else if(difference < KVACH_MAX_SCORE * 2 && difference > 0)
-			{
-				game.players[to]->score -= (difference / 2)*num_players; //New kvacher loose points
-				dmg = difference / 2;
-				game.players[from]->score += dmg; //Last kvacher gain points
-				str_format(buf, sizeof(buf), "%d (+%d) ", game.players[from]->score, dmg);
-			}
-			else
-				str_format(buf, sizeof(buf), "You gain nothing, victim is too weak.");
+			//int difference = player->score - game.players[from]->score;
+			//char buf[64];
+			//CHARACTER *ents[64];
+			//float radius = 800.0f;
+			//int num_players = game.world.find_entities(game.players[kvacher_client_id]->get_character()->pos, radius, (ENTITY**)ents, 64, NETOBJTYPE_CHARACTER);
+			//if(num_players > 1)
+			//		num_players -= 1;
+			//if(difference >= KVACH_MAX_SCORE * 2)
+			//{
+			//	
+			//	game.players[to]->score -= KVACH_MAX_SCORE*num_players; //New kvacher loose points
+			//	dmg = KVACH_MAX_SCORE;
+			//	game.players[from]->score += dmg; //Last kvacher gain points		
+			//	str_format(buf, sizeof(buf), "%d (+%d Good choise!) ", game.players[from]->score, KVACH_MAX_SCORE);
+			//}
+			//else if(difference < KVACH_MAX_SCORE * 2 && difference > 0)
+			//{
+			//	game.players[to]->score -= (difference / 2)*num_players; //New kvacher loose points
+			//	dmg = difference / 2;
+			//	game.players[from]->score += dmg; //Last kvacher gain points
+			//	str_format(buf, sizeof(buf), "%d (+%d) ", game.players[from]->score, dmg);
+			//}
+			//else
+			//	str_format(buf, sizeof(buf), "You gain nothing, victim is too weak.");
 
-			game.send_broadcast(buf, game.players[from]->client_id);
+			//game.send_broadcast(buf, game.players[from]->client_id);
 
 			//if(game.players[to]->score < 0)
 			//		game.players[to]->score = 0;
@@ -372,7 +372,7 @@ void GAMECONTROLLER_KVACH::damage_calculate(class CHARACTER *chrTo, int dmg, cla
 	{
 		//Make damage greater if player has fewer score point than kvacher.
 		factor = (game.players[player->client_id]->score - game.players[from]->score)/(config.sv_scorelimit*10/100) + 1;
-		dmg = (dmg + chrFrom->damage_bonus) * factor;
+		dmg = (dmg + chrFrom->damage_bonus)/* * factor*/;
 	}
 
 	if(kvacher_client_id == player->client_id)// If this tee is kvacher..
